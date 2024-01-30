@@ -1,0 +1,61 @@
+use crate::osc::sin_wt::WavetableOscillator;
+use poem::{
+    error::{InternalServerError, ResponseError},
+    get, handler,
+    http::StatusCode,
+    listener::TcpListener,
+    web::{Html, Json},
+    Body, Response, Route, Server,
+};
+use poem_openapi::{
+    payload::{Attachment, AttachmentType},
+    Object, OpenApi, OpenApiService,
+};
+use std::sync::{Arc, Mutex};
+
+struct Api {
+    outputs: Arc<Mutex<Vec<u8>>>,
+}
+
+// HTTP
+#[OpenApi]
+impl Api {
+    pub fn new() -> Self {
+        let outputs = Arc::new(Mutex::new(Vec::new()));
+
+        Api { outputs }
+    }
+
+    /// connects this modules output to an input of another node
+    #[oai(path = "/connect/{output}", method = "post")]
+    async fn connect(&self) {
+        // TODO: get ip and port from post params
+        // TODO: save connection in struct
+
+        // self.outputs.lock().unwrap().push(1);
+        // TODO: send data to it.
+    }
+
+    /// tells the module to disconnect the selected output
+    #[oai(path = "/disconnect/{output}", method = "post")]
+    async fn disconnect(&self) {
+        // TODO: find connection
+        // TODO: kill connection
+    }
+}
+
+async fn start() -> anyhow::Result<()> {
+    let api_service =
+        OpenApiService::new(Api::new(), "vco", "0.1.0").server("http://localhost:8080");
+    // let ui = api_service.openapi_explorer();
+    let route = Route::new()
+        // .at("/", get(index))
+        .nest("/api", api_service);
+    // .nest("/ui", ui);
+    // info!("server start");
+    println!("server start");
+    Server::new(TcpListener::bind("127.0.0.1:3000"))
+        .run(route)
+        .await?;
+    Ok(())
+}
