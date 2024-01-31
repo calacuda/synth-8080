@@ -4,12 +4,14 @@ use crate::{
     Float,
 };
 use actix::{Actor, StreamHandler};
-use actix_web::{get, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{
+    get, http::header::ContentType, web, App, Error, HttpRequest, HttpResponse, HttpServer,
+};
 use actix_web_actors::ws;
 use anyhow::{bail, ensure, Result};
 use serde::Deserialize;
 use std::{
-    net::IpAddr,
+    net::{IpAddr, Ipv4Addr},
     ops::DerefMut,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -296,8 +298,6 @@ async fn set_note(data: web::Data<Vco>, path: web::Path<Note>) -> String {
     data.set_note(path.clone())
 }
 
-// TODO: add http setter for note.
-
 #[get("/input/{i}")]
 async fn module_input(
     data: web::Data<Vco>,
@@ -320,25 +320,26 @@ async fn module_input(
     resp
 }
 
-pub async fn start() -> anyhow::Result<()> {
-    // let _span = span!(Level::TRACE, "VCO-global").entered();
-    // println!("VCO");
-    // info!("VCO-global");
-    // Note: web::Data created _outside_ HttpServer::new closure
+// pub async fn register(args: &crate::NodeArgs) -> Result<()> {
+//     // TODO:send api request to register this module and its info with the c2 module
+//
+//     Ok(())
+// }
+
+pub async fn start(ip: &str, port: u16) -> anyhow::Result<()> {
     let osc = Vco::new();
     osc.start();
     let vco = web::Data::new(osc);
 
     HttpServer::new(move || {
-        // move counter into the closure
         App::new()
-            .app_data(vco.clone()) // <- register the created data
+            .app_data(vco.clone())
             .service(connect_to)
             .service(module_input)
             .service(set_osc_type)
             .service(set_overtones)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind((ip, port))?
     .run()
     .await?;
     Ok(())
