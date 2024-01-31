@@ -4,17 +4,17 @@ use crate::{
     Float,
 };
 use actix::{Actor, StreamHandler};
-use actix_web::{
-    get, http::header::ContentType, web, App, Error, HttpRequest, HttpResponse, HttpServer,
-};
+use actix_web::{get, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
 use anyhow::{bail, ensure, Result};
 use serde::Deserialize;
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::IpAddr,
     ops::DerefMut,
     str::FromStr,
     sync::{Arc, Mutex},
+    // thread::sleep,
+    // time::Duration,
 };
 use tokio::{
     task::{spawn, JoinHandle},
@@ -127,10 +127,17 @@ impl Vco {
         }
     }
 
-    pub async fn connect_to(&self, output_select: u8, ip: IpAddr, input_select: u8) -> Result<()> {
+    pub async fn connect_to(
+        &self,
+        output_select: u8,
+        ip: IpAddr,
+        port: u16,
+        input_select: u8,
+    ) -> Result<()> {
         ensure!(output_select < N_OUTPUTS, "invalid output selection");
 
-        let uri = Url::from_str(format!("ws://{}:8080/input/{}", ip, input_select).as_str())?;
+        let uri = Url::from_str(format!("ws://{}:{}/input/{}", ip, port, input_select).as_str())?;
+        info!("connecting to url {uri}");
         let connection = connect(uri)?;
 
         if output_select == 0 {
@@ -173,20 +180,32 @@ impl Vco {
     pub fn start(&self) {
         let osc = self.osc.clone();
         let outs = self.pitch_output.clone();
+        // let bend =  self.pitch_bend_in.clone();
+        // let bend_amt = self.bend_amt.clone();
+        // let note = self.note.clone();
 
         let jh = spawn(async move {
             // let mut last_send = Instant::now();
+            let dur = Duration::from_nanos(20830);
 
             loop {
-                sleep(Duration::from_nanos(20830)).await;
+                sleep(dur).await;
+                // let bends = bend.lock().unwrap();
+                // self.apply_bend(bends.iter().sum::<Float>() / bends.len() as Float);
+                // osc.lock().unwrap().set_frequency(Vco::apply_bend(
+                //     note.lock().unwrap().clone().into(),
+                //     bends.iter().sum::<Float>() / bends.len() as Float,
+                //     *bend_amt,
+                // ));
                 let sample = osc.lock().unwrap().get_sample().to_le_bytes();
+                // info!("{sample:?}");
                 outs.lock()
                     .unwrap()
                     .deref_mut()
                     .iter_mut()
                     .for_each(|(socket, _res)| {
                         if let Err(e) = socket.send(Message::Binary(sample.to_vec())) {
-                            error!("{e}")
+                            error!("{e}");
                         }
                     });
             }
@@ -197,26 +216,29 @@ impl Vco {
     }
 
     /// applies a pitch bend by changing the oscilators frequency
-    fn apply_bend(&self, bend: Float) {
-        let note = self.note.lock().unwrap();
-        let note: Float = (*note).clone().into();
+    fn apply_bend(note: Float, bend: Float, bend_amt: Float) -> Float {
+        // let note = self.note.lock().unwrap();
+        // let note: Float = (*note).clone().into();
 
         // get frequency shift
         // self.note + (bend * )
-        let shift = bend * (note * *self.bend_amt);
+        let shift = bend * (note * bend_amt);
 
-        let mut osc = self.osc.lock().unwrap();
-        (*osc).set_frequency(if bend > 0.0 {
+        // let mut osc = self.osc.lock().unwrap();
+        if bend > 0.0 {
             note + (note * shift)
-        } else {
+        } else if bend < 0.0 {
             note - (note / shift)
-        });
+        } else {
+            note
+        }
     }
 
     pub fn set_note(&self, note: Note) -> String {
         let mut n = self.note.lock().unwrap();
         // get frequency from note
         *n = note;
+        self.osc.lock().unwrap().set_frequency(n.clone().into());
 
         format!("set note to {n}")
     }
@@ -243,10 +265,10 @@ impl Actor for InputCtrl {
 
 /// Handler for ws::Message message
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for InputCtrl {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, _ctx: &mut Self::Context) {
         match msg {
-            Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-            Ok(ws::Message::Text(text)) => ctx.text(format!("echoing {text}")),
+            // Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
+            // Ok(ws::Message::Text(text)) => ctx.text(format!("echoing {text}")),
             Ok(ws::Message::Binary(bin)) => {
                 // ctx.binary(bin)
                 if let Ok(sample) = mk_float(&*bin) {
@@ -264,18 +286,18 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for InputCtrl {
     }
 }
 
-#[get("/connect/{output}/{ip}/{input}")]
-async fn connect_to(data: web::Data<Vco>, path: web::Path<(u8, IpAddr, u8)>) -> String {
+#[get("/connect/{output}/{ip}/{port}/{input}")]
+async fn connect_to(data: web::Data<Vco>, path: web::Path<(u8, IpAddr, u16, u8)>) -> String {
     // info!("connect command recieved");
-    if let Err(e) = data.connect_to(path.0, path.1, path.2).await {
+    if let Err(e) = data.connect_to(path.0, path.1, path.2, path.3).await {
         let res = format!("failed to connect to output, got error: {e}");
         error!(res);
 
         res
     } else {
         format!(
-            "connecting output {} to input ws://{}:8080/{}",
-            path.0, path.1, path.2
+            "connecting output {} to input ws://{}:{}/{}",
+            path.0, path.1, path.2, path.3
         )
     }
 }
@@ -320,12 +342,6 @@ async fn module_input(
     resp
 }
 
-// pub async fn register(args: &crate::NodeArgs) -> Result<()> {
-//     // TODO:send api request to register this module and its info with the c2 module
-//
-//     Ok(())
-// }
-
 pub async fn start(ip: &str, port: u16) -> anyhow::Result<()> {
     let osc = Vco::new();
     osc.start();
@@ -336,6 +352,7 @@ pub async fn start(ip: &str, port: u16) -> anyhow::Result<()> {
             .app_data(vco.clone())
             .service(connect_to)
             .service(module_input)
+            .service(set_note)
             .service(set_osc_type)
             .service(set_overtones)
     })

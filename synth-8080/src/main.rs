@@ -26,6 +26,7 @@ pub mod mid_pass;
 pub mod osc;
 pub mod output;
 pub mod reverb;
+pub mod router;
 pub mod vco;
 
 // pub type Float = f32;
@@ -75,6 +76,7 @@ impl FromStr for NodeType {
             "echo" => Ok(NodeType::Echo),
             "lfo" => Ok(NodeType::LFO),
             "mid-pass" | "band-pass" => Ok(NodeType::MidPass),
+            "output" | "audio-out" | "out" => Ok(NodeType::Output),
             "reverb" => Ok(NodeType::Reverb),
             "vco" => Ok(NodeType::VCO),
             _ => Err(format!("\"{s}\" is not a valid module name")),
@@ -163,7 +165,7 @@ struct Cli {
     cmd: SubCmd,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
@@ -208,10 +210,8 @@ async fn new_node(args: NodeArgs) -> Result<()> {
     info!("register responce status code: {}", res.status());
 
     match args.module {
-        NodeType::VCO => {
-            // vco::register(&args).await?;
-            vco::start(bind_ip, args.mod_port).await?;
-        }
+        NodeType::VCO => vco::start(bind_ip, args.mod_port).await?,
+        NodeType::Output => output::start(bind_ip, args.mod_port).await?,
         _ => {}
     }
     // start server

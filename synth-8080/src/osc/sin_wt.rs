@@ -54,6 +54,9 @@ impl WavetableOscillator {
 
 impl super::Osc for WavetableOscillator {
     fn get_sample(&mut self) -> Float {
+        // let sample = self.sample();
+        // println!("{sample}");
+        // sample
         self.sample()
     }
 
@@ -62,10 +65,10 @@ impl super::Osc for WavetableOscillator {
     }
 }
 
-impl Iterator for WavetableOscillator {
-    type Item = Float;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(self.sample())
-    }
-}
+// impl Iterator for WavetableOscillator {
+//     type Item = Float;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         Some(self.sample())
+//     }
+// }
