@@ -1,4 +1,3 @@
-use crate::NodeType;
 use actix_web::{get, post, web, App, HttpServer};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -24,8 +23,6 @@ pub struct Module {
     // pub n_ins: u8,
     // /// the number of outputs
     // pub n_outs: u8,
-    /// the type of module
-    pub kind: NodeType,
 }
 
 struct Controller {
