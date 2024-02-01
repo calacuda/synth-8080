@@ -1,26 +1,24 @@
 use crate::{
-    common::{mk_float, not_found, Connection},
-    router::{Modules, Router},
-    Float,
+    common::{Connection, Module},
+    router::{router_read_sample, router_send_sync, ModuleInRX, Router},
 };
-use anyhow::{ensure, Result};
 use rodio::{OutputStream, OutputStreamHandle, Source};
-use std::{
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
-use tracing::{error, info};
+use std::ops::Deref;
+use tokio::spawn;
+use tracing::{info, warn};
 
 pub const N_INPUTS: u8 = 1;
+pub const N_OUTPUTS: u8 = 0;
 
 #[derive(Clone)]
 pub struct Audio {
-    routing_table: Router,
+    router: Router,
+    id: usize,
 }
 
 impl Audio {
-    pub fn new(routing_table: Router) -> Self {
-        Self { routing_table }
+    pub fn new(router: Router, id: usize) -> Self {
+        Self { router, id }
     }
 }
 
@@ -28,14 +26,13 @@ impl Iterator for Audio {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut ins = self.routing_table.deref()[1][0].lock().unwrap();
-        let sample = (ins.iter().filter_map(|f| *f).sum::<Float>() / ins.len() as f64) as f32;
-        // ins.clear();
-        ins.iter_mut().for_each(|f| *f = None);
+        let input = &self.router.deref()[self.id][0].input;
+        router_send_sync(input);
+        // info!("sync sent");
+        let sample = router_read_sample(input);
         // info!("sample => {sample}");
-        // info!("ins => {ins:?}");
 
-        Some(sample)
+        Some(sample as f32)
     }
 }
 
@@ -57,19 +54,61 @@ impl Source for Audio {
     }
 }
 
-pub async fn start(
-    routing_table: Router,
-    modules: &mut Modules,
-) -> anyhow::Result<(OutputStream, OutputStreamHandle)> {
-    let audio = Audio::new(routing_table);
+// TODO: make output able to pass its input transparently (so i can visualize audio out)
 
-    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+impl Module for Output {
+    fn start(&self) -> anyhow::Result<tokio::task::JoinHandle<()>> {
+        let audio = self.audio.clone();
 
-    stream_handle.play_raw(audio.clone())?;
+        Ok(spawn(async move {
+            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+            let res = stream_handle.play_raw(audio);
 
-    modules.output = Some(audio);
+            info!("stream result: {res:?}");
+            info!("playing generated audio");
 
-    Ok((_stream, stream_handle))
+            loop {}
+
+            // warn!("stopping audio playback");
+        }))
+    }
+
+    fn connect(&self, _connection: Connection) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn disconnect(&self, _connection: Connection) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
-// pub async fn prepare() -> anyhow::Result {}
+pub struct Output {
+    pub audio: Audio,
+}
+
+impl Output {
+    // TODO: pass router_table and something that can index it to get inputs
+    pub async fn new(router_table: Router, mod_id: u8) -> Self {
+        let audio = Audio::new(router_table, mod_id as usize);
+        info!("made audio struct to handle audio out");
+
+        Self { audio }
+    }
+}
+
+// pub async fn start(inputs: ModuleInRX) -> Result<((OutputStream, OutputStreamHandle), Audio)> {
+//     // TODO: add a record to file mode
+//     let audio = Audio::new(inputs);
+//     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+//     stream_handle.play_raw(audio.clone())?;
+//
+//     Ok(((_stream, stream_handle), audio))
+// }
+
+// pub async fn prepare() -> ModuleInfo {
+//     ModuleInfo {
+//         n_ins: 1,
+//         n_outs: 0,
+//         io: mk_module_ins(1),
+//     }
+// }

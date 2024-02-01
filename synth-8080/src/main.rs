@@ -1,9 +1,6 @@
 use anyhow::Result;
-use router::{Modules, Router};
-use std::{
-    mem,
-    sync::{Arc, Mutex},
-};
+use common::ModuleType;
+use std::mem;
 use tracing::info;
 
 pub mod adbdr;
@@ -43,21 +40,14 @@ async fn main() -> Result<()> {
     info!("synth begin");
 
     // TODO: read config
+    let modules = [ModuleType::Vco, ModuleType::Output];
 
-    let router: Router = Arc::new(vec![
-        vec![Arc::new(Mutex::new(Vec::with_capacity(3)))],
-        vec![Arc::new(Mutex::new(Vec::with_capacity(1)))],
-    ]);
-    let mut modules = Modules::default();
+    let ctrlr = controller::Controller::new(&modules).await?;
+    // info!("{}", ctrlr.modules.lock().unwrap().len());
+    ctrlr.connect(0, 0, 1, 0)?;
+    ctrlr.start().await?;
 
-    let (oscilator, handle) = vco::start(router.clone()).await?;
-    oscilator.connect_to(0, 1, 0).await?;
-    oscilator.set_note(common::notes::Note::A4);
-    modules.vco.push(oscilator);
-    // TODO: trun led red
+    ctrlr.handles.iter().for_each(|handle| handle.abort());
 
-    let (_stream, _audio_handle) = output::start(router, &mut modules).await?;
-
-    handle.await?;
     Ok(())
 }
