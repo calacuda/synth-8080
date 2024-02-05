@@ -1,48 +1,22 @@
 use crate::{
     common::{bend_range, event_loop, notes::Note, Connection, Module},
-    osc::{sin_wt::WavetableOscillator, Osc},
+    osc::{sin_wt::WavetableOscillator, Osc, OscType},
     router::{ModuleIn, Router},
     Float,
 };
 use anyhow::{bail, ensure, Result};
-use serde::Deserialize;
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 use tokio::task::{spawn, JoinHandle};
 use tracing::{error, info};
 
 pub const N_INPUTS: u8 = 3;
 pub const N_OUTPUTS: u8 = 1;
-
-#[derive(Deserialize, Debug, Clone)]
-pub enum OscType {
-    #[serde(rename = "sine", alias = "sin")]
-    Sine,
-    #[serde(rename = "square", alias = "squ")]
-    Square,
-    #[serde(rename = "triangle", alias = "tri")]
-    Triangle,
-    #[serde(rename = "saw-tooth", alias = "sawtooth", alias = "saw")]
-    SawTooth,
-}
-
-enum Input {
-    Volume = 0,
-    PitchBend = 1,
-    Pitch = 2,
-}
-
-impl TryFrom<u8> for Input {
-    type Error = anyhow::Error;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::Volume),
-            1 => Ok(Self::PitchBend),
-            2 => Ok(Self::Pitch),
-            _ => bail!("invalid input number"),
-        }
-    }
-}
+pub const VOLUME_INPUT: u8 = 0;
+pub const PITCH_INPUT: u8 = 1;
+pub const PITCH_BEND_INPUT: u8 = 2;
 
 pub struct Vco {
     pub routing_table: Router,
@@ -77,6 +51,7 @@ impl Vco {
         let osc_type = Arc::new(Mutex::new(OscType::Sine));
         let osc: Arc<Mutex<Box<dyn Osc>>> =
             Arc::new(Mutex::new(Box::new(WavetableOscillator::new())));
+        // DEBUG
         osc.lock().unwrap().set_frequency(Note::A4.into());
         let outputs = Arc::new(Mutex::new(Vec::new()));
         // let playing_out = Arc::new(Mutex::new(Vec::new()));
@@ -105,21 +80,16 @@ impl Vco {
         }
     }
 
-    pub fn connect_to(&self, connection: Connection) -> Result<()> {
+    pub fn connect_auido_out_to(&self, connection: Connection) -> Result<()> {
         ensure!(
             connection.src_output < N_OUTPUTS,
             "invalid output selection"
         );
-
-        if connection.src_output == 0 {
-            ensure!(
-                !self.outputs.lock().unwrap().contains(&connection),
-                "module already connected"
-            );
-            self.outputs.lock().unwrap().push(connection);
-        } else if connection.src_output == 1 {
-            bail!("unhandled valid output selction. in other words a valid output was selected but that output handling code was not yet written.");
-        }
+        ensure!(
+            !self.outputs.lock().unwrap().contains(&connection),
+            "module already connected"
+        );
+        self.outputs.lock().unwrap().push(connection);
 
         info!(
             "connected output: {}, of module: {}, to input: {}, of module: {}",
@@ -138,7 +108,7 @@ impl Vco {
             "invalid output selection"
         );
 
-        if connection.src_output == 0 {
+        if connection.src_output == VOLUME_INPUT {
             ensure!(
                 self.outputs.lock().unwrap().contains(&connection),
                 "module not connected"
@@ -147,7 +117,8 @@ impl Vco {
                 .lock()
                 .unwrap()
                 .retain(|out| *out != connection);
-        } else if connection.src_output == 1 {
+        } else if connection.src_output == PITCH_INPUT || connection.src_output == PITCH_BEND_INPUT
+        {
             bail!("unhandled valid output selction. in other words a valid output was selected but that output handling code was not yet written.");
         }
 
@@ -194,29 +165,11 @@ impl Vco {
         let outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let volume = self.volume_in.clone();
+        let volume_2 = self.volume_in.clone();
         let id = self.id as usize;
-        // let ins = self
-        //     .routing_table
-        //     .get(self.id as usize)
-        //     .unwrap_or(&empty_vec);
-        // let volume = self.volume_in.clone();
-        // // let play_outs = self.play_out.clone();
-        // // let bend =  self.pitch_bend_in.clone();
-        // // let bend_amt = self.bend_amt.clone();
-        // // let note = self.note.clone();
-        // let gen_sample: Box<dyn FnMut() -> Float> =
-        //     Box::new(move || osc.lock().unwrap().get_sample());
-        // let update_volume: Box<dyn FnMut(&[Float])> = Box::new(move |samples: &[Float]| {
-        //     let mut v = volume.lock().unwrap();
-        //     *v = samples.iter().sum::<Float>();
-        // });
-        // let outputs = vec![(outs, gen_sample)];
-        // let inputs = vec![(&ins[0], update_volume)];
-        // // let io = IO { outputs, inputs };
 
         spawn(async move {
-            // let empty_vec = Vec::new();
-            // let ins = router.get(id).unwrap_or(&empty_vec);
+            // prepare call back for event loop
             let ins: &Vec<ModuleIn> = (*router)
                 .get(id)
                 .expect("this VCO was not found in the routing table struct.")
@@ -225,17 +178,20 @@ impl Vco {
             // let bend =  self.pitch_bend_in.clone();
             // let bend_amt = self.bend_amt.clone();
             // let note = self.note.clone();
-            let gen_sample: Box<dyn FnMut() -> Float> =
-                Box::new(move || osc.lock().unwrap().get_sample());
+            let gen_sample: Box<dyn FnMut() -> Float> = Box::new(move || {
+                osc.lock().unwrap().get_sample() * volume_2.lock().unwrap().deref()
+            });
             let update_volume: Box<dyn FnMut(&[Float])> = Box::new(move |samples: &[Float]| {
                 let mut v = volume.lock().unwrap();
-                *v = samples.iter().sum::<Float>() / (samples.len() as Float);
+                let tmp_v = samples.iter().sum::<Float>() / (samples.len() as Float);
+                *v = (tmp_v * 0.5) + 0.5;
             });
             let mut outputs = vec![(outs, gen_sample)];
             // TODO: add pitch input
             // TODO: add pitch bend input
-            let mut inputs = vec![(&ins[0], update_volume)];
-            // let io = IO { outputs, inputs };
+            let mut inputs = vec![(&ins[VOLUME_INPUT as usize], update_volume)];
+
+            // start the event loop
             event_loop(router.clone(), &mut inputs, &mut outputs);
         })
     }
@@ -277,7 +233,7 @@ impl Module for Vco {
     }
 
     fn connect(&self, connection: Connection) -> anyhow::Result<()> {
-        self.connect_to(connection)?;
+        self.connect_auido_out_to(connection)?;
         // self.routing_table.inc_connect_counter(connection);
         info!("connecting: {connection:?}");
 
@@ -285,7 +241,6 @@ impl Module for Vco {
     }
 
     fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
-        // TODO: pop from self.outputs
         self.disconnect_from(connection)?;
         info!("disconnecting: {connection:?}");
 

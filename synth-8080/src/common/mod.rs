@@ -1,5 +1,5 @@
 use crate::{
-    output,
+    lfo, output,
     router::{
         mk_module_ins, router_read_sample, router_read_sync, router_send_sample, router_send_sync,
         ModuleIn, ModuleIns, Router,
@@ -20,6 +20,7 @@ pub mod notes;
 pub enum ModuleType {
     Vco,
     Output,
+    Lfo,
 }
 
 impl ModuleType {
@@ -30,6 +31,7 @@ impl ModuleType {
         let module: Box<dyn Module> = match *self {
             ModuleType::Vco => Box::new(vco::Vco::new(routing_table, id)),
             ModuleType::Output => Box::new(output::Output::new(routing_table, id).await),
+            ModuleType::Lfo => Box::new(lfo::Lfo::new(routing_table, id)),
         };
 
         info!("made a {self:?} module");
@@ -48,6 +50,11 @@ impl ModuleType {
                 n_ins: output::N_INPUTS,
                 n_outs: output::N_OUTPUTS,
                 io: mk_module_ins(output::N_INPUTS as usize),
+            },
+            ModuleType::Lfo => ModuleInfo {
+                n_ins: lfo::N_INPUTS,
+                n_outs: lfo::N_OUTPUTS,
+                io: mk_module_ins(lfo::N_INPUTS as usize),
             },
         }
     }
@@ -119,6 +126,7 @@ fn sync_with_inputs(ins: &mut [(&ModuleIn, Box<dyn FnMut(&[Float])>)]) {
             .map(|_i| {
                 // send sync signal
                 router_send_sync(&cons.input);
+                // info!("reading sample");
                 // read sample from connection
                 router_read_sample(&cons.input)
             })

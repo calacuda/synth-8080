@@ -40,11 +40,13 @@ async fn main() -> Result<()> {
     info!("synth begin");
 
     // TODO: read config
-    let modules = [ModuleType::Vco, ModuleType::Output];
+    let modules = [ModuleType::Vco, ModuleType::Output, ModuleType::Lfo];
 
     let ctrlr = controller::Controller::new(&modules).await?;
-    // info!("{}", ctrlr.modules.lock().unwrap().len());
+    info!("{} modules made", ctrlr.modules.lock().unwrap().len());
     ctrlr.connect(0, 0, 1, 0)?;
+    ctrlr.connect(2, 0, 0, vco::VOLUME_INPUT)?;
+    // info!("info => {}", ctrlr.module);
     ctrlr.start().await?;
 
     ctrlr.handles.iter().for_each(|handle| handle.abort());
