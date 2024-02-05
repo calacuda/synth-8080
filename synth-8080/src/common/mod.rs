@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use std::{
     fmt::Debug,
-    ops::{Deref, Index},
+    ops::{Deref, DerefMut, Index},
     sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
@@ -68,8 +68,8 @@ pub struct Connection {
 }
 
 pub struct IO {
-    inputs: Arc<Mutex<Vec<(Vec<Connection>, fn(&[Float]))>>>,
-    outputs: Arc<Mutex<Vec<(Vec<Connection>, fn() -> Float)>>>,
+    pub inputs: Vec<(ModuleIn, Box<dyn FnMut(&[Float])>)>,
+    pub outputs: Vec<(Arc<Mutex<Vec<Connection>>>, Box<dyn FnMut() -> Float>)>,
 }
 
 impl Index<Connection> for Router {
@@ -111,39 +111,52 @@ pub fn bend_range() -> Float {
     (2.0 as Float).powf(2.0 / 12.0)
 }
 
-fn sync_with_inputs(router: Router, ins: Arc<Mutex<Vec<(Vec<Connection>, fn(&[Float]))>>>) {
-    ins.lock().unwrap().iter().for_each(|(cons, f)| {
-        // send sync
-        cons.iter()
-            .for_each(|con| router_send_sync(&router[*con].input));
-        // read sample from sync
-        let sample: Vec<Float> = cons
-            .iter()
-            .map(|con| router_read_sample(&router[*con].input))
+fn sync_with_inputs(ins: &mut [(&ModuleIn, Box<dyn FnMut(&[Float])>)]) {
+    ins.iter_mut().for_each(|(cons, f)| {
+        let n_cons = *cons.active_connections.lock().unwrap();
+
+        let sample: Vec<Float> = (0..n_cons)
+            .map(|_i| {
+                // send sync signal
+                router_send_sync(&cons.input);
+                // read sample from connection
+                router_read_sample(&cons.input)
+            })
             .collect();
+
         f(&sample);
     })
 }
 
-fn send_samples(router: Router, outs: Arc<Mutex<Vec<(Vec<Connection>, fn() -> Float)>>>) {
-    outs.lock().unwrap().iter().for_each(|(cons, f)| {
+fn send_samples(
+    router: Router,
+    outs: &mut [(Arc<Mutex<Vec<Connection>>>, Box<dyn FnMut() -> Float>)],
+) {
+    outs.iter_mut().for_each(|(cons, f)| {
         let sample = f();
 
-        cons.iter().for_each(|con| {
+        cons.lock().unwrap().iter().for_each(|con| {
             if let Err(e) = router_read_sync(router.clone(), *con) {
                 error!("encountered an error waiting for sync message: {e}");
             }
         });
 
-        cons.iter().for_each(|connection| {
+        cons.lock().unwrap().iter().for_each(|connection| {
             router_send_sample(router.clone(), *connection, sample);
         });
     })
 }
 
-pub fn send_sample(router: Router, io: IO) {
+// TODO: make this a macro
+pub fn event_loop(
+    router: Router,
+    inputs: &mut Vec<(&ModuleIn, Box<dyn FnMut(&[Float])>)>,
+    outputs: &mut [(Arc<Mutex<Vec<Connection>>>, Box<dyn FnMut() -> Float>)],
+) {
+    info!("starting event loop");
+
     loop {
-        sync_with_inputs(router.clone(), io.inputs.clone());
-        send_samples(router.clone(), io.outputs.clone())
+        sync_with_inputs(inputs);
+        send_samples(router.clone(), outputs)
     }
 }

@@ -58,6 +58,7 @@ impl Source for Audio {
 
 impl Module for Output {
     fn start(&self) -> anyhow::Result<tokio::task::JoinHandle<()>> {
+        info!("Output started");
         let audio = self.audio.clone();
 
         Ok(spawn(async move {

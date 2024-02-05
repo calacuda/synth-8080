@@ -1,15 +1,12 @@
 use crate::{
-    common::{bend_range, notes::Note, Connection, Module},
+    common::{bend_range, event_loop, notes::Note, Connection, Module},
     osc::{sin_wt::WavetableOscillator, Osc},
-    router::{router_read_sync, router_send_sample, Router, RoutingTable},
+    router::{ModuleIn, Router},
     Float,
 };
 use anyhow::{bail, ensure, Result};
 use serde::Deserialize;
-use std::{
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use tokio::task::{spawn, JoinHandle};
 use tracing::{error, info};
 
@@ -58,7 +55,7 @@ pub struct Vco {
 
     // pub playing_out: Arc<Mutex<Vec<Connection>>>,
     /// where the data from the volume input is stored
-    pub volume_in: Arc<Mutex<Vec<Float>>>,
+    pub volume_in: Arc<Mutex<Float>>,
     /// where the data from the pitch bend input is stored
     pub pitch_bend_in: Arc<Mutex<Vec<Float>>>,
     /// the note to be played
@@ -72,6 +69,7 @@ pub struct Vco {
     pub note: Arc<Mutex<Note>>,
     /// how much to bend the pitch when pitch bends happen
     pub bend_amt: Arc<Float>,
+    pub id: u8,
 }
 
 impl Vco {
@@ -80,10 +78,9 @@ impl Vco {
         let osc: Arc<Mutex<Box<dyn Osc>>> =
             Arc::new(Mutex::new(Box::new(WavetableOscillator::new())));
         osc.lock().unwrap().set_frequency(Note::A4.into());
-        // let audio_out = Arc::new(Mutex::new(Vec::new()));
         let outputs = Arc::new(Mutex::new(Vec::new()));
         // let playing_out = Arc::new(Mutex::new(Vec::new()));
-        let volume_in = Arc::new(Mutex::new(Vec::new()));
+        let volume_in = Arc::new(Mutex::new(1.0));
         let pitch_bend_in = Arc::new(Mutex::new(Vec::new()));
         let pitch_in = Arc::new(Mutex::new(Vec::new()));
         let overtones = Arc::new(Mutex::new(false));
@@ -104,6 +101,7 @@ impl Vco {
             generator,
             note,
             bend_amt,
+            id,
         }
     }
 
@@ -191,30 +189,54 @@ impl Vco {
 
     /// starts a thread to generate samples.
     pub fn start_event_loop(&self) -> JoinHandle<()> {
+        // let empty_vec = Vec::new();
         let osc = self.osc.clone();
         let outs = self.outputs.clone();
         let router = self.routing_table.clone();
-        // let play_outs = self.play_out.clone();
-        // let bend =  self.pitch_bend_in.clone();
-        // let bend_amt = self.bend_amt.clone();
-        // let note = self.note.clone();
+        let volume = self.volume_in.clone();
+        let id = self.id as usize;
+        // let ins = self
+        //     .routing_table
+        //     .get(self.id as usize)
+        //     .unwrap_or(&empty_vec);
+        // let volume = self.volume_in.clone();
+        // // let play_outs = self.play_out.clone();
+        // // let bend =  self.pitch_bend_in.clone();
+        // // let bend_amt = self.bend_amt.clone();
+        // // let note = self.note.clone();
+        // let gen_sample: Box<dyn FnMut() -> Float> =
+        //     Box::new(move || osc.lock().unwrap().get_sample());
+        // let update_volume: Box<dyn FnMut(&[Float])> = Box::new(move |samples: &[Float]| {
+        //     let mut v = volume.lock().unwrap();
+        //     *v = samples.iter().sum::<Float>();
+        // });
+        // let outputs = vec![(outs, gen_sample)];
+        // let inputs = vec![(&ins[0], update_volume)];
+        // // let io = IO { outputs, inputs };
 
         spawn(async move {
-            loop {
-                // TODO: get inputs and do the things
-
-                let sample = osc.lock().unwrap().get_sample();
-
-                outs.lock().unwrap().deref().iter().for_each(|con| {
-                    if let Err(e) = router_read_sync(router.clone(), *con) {
-                        error!("encountered an error waiting for sync message: {e}");
-                    }
-                });
-
-                outs.lock().unwrap().deref().iter().for_each(|connection| {
-                    router_send_sample(router.clone(), *connection, sample);
-                });
-            }
+            // let empty_vec = Vec::new();
+            // let ins = router.get(id).unwrap_or(&empty_vec);
+            let ins: &Vec<ModuleIn> = (*router)
+                .get(id)
+                .expect("this VCO was not found in the routing table struct.")
+                .as_ref();
+            // let play_outs = self.play_out.clone();
+            // let bend =  self.pitch_bend_in.clone();
+            // let bend_amt = self.bend_amt.clone();
+            // let note = self.note.clone();
+            let gen_sample: Box<dyn FnMut() -> Float> =
+                Box::new(move || osc.lock().unwrap().get_sample());
+            let update_volume: Box<dyn FnMut(&[Float])> = Box::new(move |samples: &[Float]| {
+                let mut v = volume.lock().unwrap();
+                *v = samples.iter().sum::<Float>() / (samples.len() as Float);
+            });
+            let mut outputs = vec![(outs, gen_sample)];
+            // TODO: add pitch input
+            // TODO: add pitch bend input
+            let mut inputs = vec![(&ins[0], update_volume)];
+            // let io = IO { outputs, inputs };
+            event_loop(router.clone(), &mut inputs, &mut outputs);
         })
     }
 
