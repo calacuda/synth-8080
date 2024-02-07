@@ -1,13 +1,19 @@
 use crate::{
-    common::{event_loop, Connection, Module},
-    osc::{sin_wt::WavetableOscillator, Osc, OscType},
+    common::{event_loop, send_samples, sync_with_inputs, Connection, Module},
+    osc::{OscType, Oscilator},
     router::{ModuleIn, Router},
     Float,
 };
 use anyhow::{bail, ensure, Result};
-use std::sync::{Arc, Mutex};
-use tokio::task::{spawn, JoinHandle};
-use tracing::{error, info};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::{Arc, Mutex},
+};
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::{sleep, Duration},
+};
+use tracing::info;
 
 pub const N_INPUTS: u8 = 3;
 pub const N_OUTPUTS: u8 = 1;
@@ -19,7 +25,7 @@ pub struct Lfo {
     pub routing_table: Router,
     pub osc_type: Arc<Mutex<OscType>>,
     /// the oscilator that produces samples
-    pub osc: Arc<Mutex<Box<dyn Osc>>>,
+    pub osc: Arc<Mutex<Oscilator>>,
     /// the output where the generated samples are sent
     pub outputs: Arc<Mutex<Vec<Connection>>>,
     /// where the data from the volume input is stored
@@ -32,13 +38,14 @@ pub struct Lfo {
 impl Lfo {
     pub fn new(routing_table: Router, id: u8) -> Self {
         let osc_type = Arc::new(Mutex::new(OscType::Sine));
-        let osc: Arc<Mutex<Box<dyn Osc>>> =
-            Arc::new(Mutex::new(Box::new(WavetableOscillator::new())));
+        let osc = Arc::new(Mutex::new(Oscilator::new()));
         let outputs = Arc::new(Mutex::new(Vec::new()));
         let volume_in = Arc::new(Mutex::new(1.0));
         let pitch_in = Arc::new(Mutex::new(5.0));
+
         // DEBUG
-        osc.lock().unwrap().set_frequency(2.0);
+        osc.lock().unwrap().set_frequency(2.5);
+        (*volume_in.lock().unwrap().deref_mut()) = 0.25;
 
         Self {
             routing_table,
@@ -79,43 +86,47 @@ impl Lfo {
             "invalid output selection"
         );
 
-        if connection.src_output == VOL_IN {
-            ensure!(
-                self.outputs.lock().unwrap().contains(&connection),
-                "module not connected"
-            );
-            self.outputs
-                .lock()
-                .unwrap()
-                .retain(|out| *out != connection);
-        } else if connection.src_output == PITCH_IN {
-            bail!("unhandled valid output selction. in other words a valid output was selected but that output handling code was not yet written.");
-        }
-
-        info!(
-            "connected output: {}, of module: {}, to input: {}, of module: {}",
-            connection.src_output,
-            connection.src_module,
-            connection.dest_input,
-            connection.dest_module
+        // if connection.src_output == VOL_IN {
+        //     ensure!(
+        //         self.outputs.lock().unwrap().contains(&connection),
+        //         "module not connected"
+        //     );
+        //     self.outputs
+        //         .lock()
+        //         .unwrap()
+        //         .retain(|out| *out != connection);
+        // } else if connection.src_output == PITCH_IN {
+        //     bail!("unhandled valid output selction. in other words a valid output was selected but that output handling code was not yet written.");
+        // }
+        ensure!(
+            self.outputs.lock().unwrap().contains(&connection),
+            "module not connected"
         );
+        // info!("outputs => {:?}", self.outputs.lock().unwrap());
+        self.outputs
+            .lock()
+            .unwrap()
+            .retain(|&out| out != connection);
+        // info!("outputs => {:?}", self.outputs.lock().unwrap());
+
+        // info!(
+        //     "disconnected output: {}, of module: {}, to input: {}, of module: {}",
+        //     connection.src_output,
+        //     connection.src_module,
+        //     connection.dest_input,
+        //     connection.dest_module
+        // );
 
         Ok(())
     }
 
     pub fn set_osc_type(&self, osc_type: OscType) {
         let mut ot = self.osc_type.lock().unwrap();
-        *ot = osc_type;
 
-        match *ot {
-            OscType::Sine => {
-                let mut osc = self.osc.lock().unwrap();
-                *osc = Box::new(WavetableOscillator::new());
-                info!("set to sine wave")
-            }
-            OscType::Square => error!("not implemented yet"),
-            OscType::Triangle => error!("not implemented yet"),
-            OscType::SawTooth => error!("not implemented yet"),
+        if osc_type != *ot {
+            *ot = osc_type;
+            self.osc.lock().unwrap().set_waveform(*ot);
+            info!("set to {osc_type:?}");
         }
     }
 
@@ -127,9 +138,10 @@ impl Lfo {
     pub fn start_event_loop(&self) -> JoinHandle<()> {
         // let empty_vec = Vec::new();
         let osc = self.osc.clone();
-        let outs = self.outputs.clone();
+        let audio_outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let volume = self.volume_in.clone();
+        let volume_2 = self.volume_in.clone();
         let pitch = self.pitch_in.clone();
         let id = self.id as usize;
 
@@ -137,31 +149,32 @@ impl Lfo {
             // prepare call back for event loop
             let ins: &Vec<ModuleIn> = (*router)
                 .get(id)
-                .expect("this VCO was not found in the routing table struct.")
+                .expect("this LFO Module was not found in the routing table struct.")
                 .as_ref();
-            let gen_sample: Box<dyn FnMut() -> Float> = Box::new(move || {
-                let sample = osc.lock().unwrap().get_sample();
+            let gen_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
+                let sample = osc.lock().unwrap().get_sample() * volume_2.lock().unwrap().deref();
                 // info!("lfo output volume {}", sample);
                 sample
             });
-            let update_volume: Box<dyn FnMut(&[Float])> = Box::new(move |samples: &[Float]| {
-                let mut v = volume.lock().unwrap();
-                *v = samples.iter().sum::<Float>() / (samples.len() as Float);
-            });
-            let mut outputs = vec![(outs, gen_sample)];
-            // TODO: add pitch input
-            let update_pitch: Box<dyn FnMut(&[Float])> = Box::new(move |samples: &[Float]| {
-                let mut p = pitch.lock().unwrap();
-                *p = (samples.iter().sum::<Float>() / (samples.len() as Float)).abs() * 220.0;
-            });
+            let update_volume: Box<dyn FnMut(Vec<Float>) + Send> =
+                Box::new(move |samples: Vec<Float>| {
+                    let mut v = volume.lock().unwrap();
+                    *v = samples.iter().sum::<Float>() / (samples.len() as Float);
+                });
+            let outputs = vec![(audio_outs, gen_sample)];
+            let update_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
+                Box::new(move |samples: Vec<Float>| {
+                    let mut p = pitch.lock().unwrap();
+                    *p = (samples.iter().sum::<Float>() / (samples.len() as Float)).abs() * 220.0;
+                });
 
-            let mut inputs = vec![
+            let inputs = vec![
                 (&ins[VOL_IN as usize], update_volume),
                 (&ins[PITCH_IN as usize], update_pitch),
             ];
 
             // start the event loop
-            event_loop(router.clone(), &mut inputs, &mut outputs);
+            event_loop(router.clone(), inputs, outputs).await;
         })
     }
 }

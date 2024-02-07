@@ -1,11 +1,11 @@
 use crate::{
     common::{Connection, Module},
-    router::{router_read_sample, router_send_sync, ModuleInRX, Router},
+    router::{router_read_sample, router_send_sync, Router},
 };
-use rodio::{OutputStream, OutputStreamHandle, Source};
-use std::ops::Deref;
+use rodio::{OutputStream, Source};
+use std::{ops::Deref, thread::sleep, time::Duration};
 use tokio::spawn;
-use tracing::{info, warn};
+use tracing::info;
 
 pub const N_INPUTS: u8 = 1;
 pub const N_OUTPUTS: u8 = 0;
@@ -62,13 +62,17 @@ impl Module for Output {
         let audio = self.audio.clone();
 
         Ok(spawn(async move {
+            // let delay = sleep(Duration::from_nanos(1));
             let (_stream, stream_handle) = OutputStream::try_default().unwrap();
             let res = stream_handle.play_raw(audio);
+            // delay.await;
 
             info!("stream result: {res:?}");
             info!("playing generated audio");
 
-            loop {}
+            loop {
+                sleep(Duration::from_secs(1));
+            }
 
             // warn!("stopping audio playback");
         }))
@@ -88,7 +92,6 @@ pub struct Output {
 }
 
 impl Output {
-    // TODO: pass router_table and something that can index it to get inputs
     pub async fn new(router_table: Router, mod_id: u8) -> Self {
         let audio = Audio::new(router_table, mod_id as usize);
         info!("made audio struct to handle audio out");
@@ -98,7 +101,6 @@ impl Output {
 }
 
 // pub async fn start(inputs: ModuleInRX) -> Result<((OutputStream, OutputStreamHandle), Audio)> {
-//     // TODO: add a record to file mode
 //     let audio = Audio::new(inputs);
 //     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
 //     stream_handle.play_raw(audio.clone())?;

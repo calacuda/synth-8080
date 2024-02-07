@@ -435,6 +435,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fon"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad46a0e6c9bc688823a742aa969b5c08fdc56c2a436ee00d5c6fbcb5982c55c4"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -687,6 +696,12 @@ dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
 ]
+
+[[package]]
+name = "libm"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
 
 [[package]]
 name = "libredox"
@@ -1281,6 +1296,7 @@ dependencies = [
  "anyhow",
  "clap",
  "crossbeam-channel",
+ "fon",
  "futures",
  "prettytable",
  "rodio",
@@ -1290,6 +1306,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "twang",
 ]
 
 [[package]]
@@ -1444,6 +1461,16 @@ dependencies = [
  "thread_local",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "twang"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1e48cc01a4417b829f84bd6b40a8331ae00dacd3c53e83e7fba2eca08837f0d"
+dependencies = [
+ "fon",
+ "libm",
 ]
 
 [[package]]

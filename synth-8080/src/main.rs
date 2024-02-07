@@ -1,7 +1,8 @@
 use anyhow::Result;
 use common::ModuleType;
 use std::mem;
-use tracing::info;
+use tokio::time::{sleep, Duration};
+use tracing::{info, warn};
 
 pub mod adbdr;
 pub mod adsr;
@@ -40,16 +41,31 @@ async fn main() -> Result<()> {
     info!("synth begin");
 
     // TODO: read config
-    let modules = [ModuleType::Vco, ModuleType::Output, ModuleType::Lfo];
+    let modules = [ModuleType::Output, ModuleType::Vco, ModuleType::Lfo];
 
     let ctrlr = controller::Controller::new(&modules).await?;
     info!("{} modules made", ctrlr.modules.lock().unwrap().len());
-    ctrlr.connect(0, 0, 1, 0)?;
-    ctrlr.connect(2, 0, 0, vco::VOLUME_INPUT)?;
+
+    ctrlr.connect(1, 0, 0, 0)?;
+    // connect LFO to VCO volume input
+    // ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
+    // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+    sleep(Duration::from_secs_f64(1.0)).await;
+    ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
+    // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+    sleep(Duration::from_secs_f64(2.0)).await;
+    info!("disconnecting trem");
+    ctrlr.disconnect(2, 0, 1, vco::VOLUME_INPUT)?;
+    sleep(Duration::from_secs_f64(1.0)).await;
+    ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+
     // info!("info => {}", ctrlr.module);
     ctrlr.start().await?;
+    // sleep(Duration::from_secs(2)).await;
 
+    warn!("about to stop syntheses");
     ctrlr.handles.iter().for_each(|handle| handle.abort());
+    info!("syntheses stopped");
 
     Ok(())
 }

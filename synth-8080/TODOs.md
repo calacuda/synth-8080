@@ -6,5 +6,26 @@
 4. [x] write a default implementation of a sample generator that take a lambda to generate samples || a macro that writes the boiler plate
     - NOTE: uses a function that takes callbacks.
 5. [ ] write other modules
+    - [x] ADBDR
+    - [ ] ADSR
+    - [ ] Audio In
+    - [ ] Chorus
+    <!-- - [ ] Delay -->
+    - [x] Echo
+    - [ ] Gain/Attenuator
+    - [x] LFO
+    - [ ] Mid-Pass
+    - [x] Output
+    - [ ] Reverb
+    - [x] VCO
+6. [x] write alternate oscilators
+    - [x] sine
+    - [x] square
+    - [x] triangle
+    - [x] saw-tooth
+    - [x] overtones oscilator
 6. [ ] finish controller
-7. [ ] add a "get state" http end point for the tauri app to query
+7. [ ] write the code for the micro-controller to read the controlles
+8. [ ] add a "get state" http end point for the tauri app to query
+9. [ ] write tauri GUI front end
+10. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)

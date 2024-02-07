@@ -2,14 +2,14 @@ use crate::{
     common::{Connection, Module, ModuleInfo, ModuleType},
     router::{Router, RoutingTable},
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use futures::future::join_all;
 use std::{
-    ops::Deref,
     sync::{Arc, Mutex},
+    time::Duration,
 };
-use tokio::{spawn, task::JoinHandle};
-use tracing::info;
+use tokio::{spawn, task::JoinHandle, time::sleep};
+use tracing::{error, info};
 
 pub struct Controller {
     /// the liist of connections
@@ -71,7 +71,10 @@ impl Controller {
     pub fn start(&self) -> JoinHandle<()> {
         // TODO: trun LED red
         spawn(async move {
-            // TODO: handle serial evvents from micro controller
+            // TODO: handle serial events from micro controller
+            loop {
+                sleep(Duration::from_secs(1)).await
+            }
         })
     }
 
@@ -99,11 +102,15 @@ impl Controller {
             "the requested connection is already made"
         );
 
-        self.modules.lock().unwrap()[src_module as usize]
+        if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
             .1
-            .connect(con)?;
-        self.routing_table.inc_connect_counter(con);
+            .connect(con)
+        {
+            error!("no connection made. encountered error: {e}");
+            bail!(e);
+        }
         self.connections.lock().unwrap().push(con);
+        self.routing_table.inc_connect_counter(con);
 
         Ok(())
     }
@@ -128,10 +135,15 @@ impl Controller {
             "the requested connection is possible made, not disconnecting"
         );
 
-        self.modules.lock().unwrap()[src_module as usize]
-            .1
-            .disconnect(con)?;
+        // the counter must be decremented first to avoid the synth seezing up
         self.routing_table.dec_connect_counter(con);
+        if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
+            .1
+            .disconnect(con)
+        {
+            self.routing_table.inc_connect_counter(con);
+            bail!(e);
+        }
         self.connections.lock().unwrap().retain(|c| c != &con);
 
         Ok(())

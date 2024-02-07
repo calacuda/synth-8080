@@ -1,6 +1,6 @@
 use crate::{common::Connection, Float};
 use anyhow::bail;
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use tracing::{error, info};
 
@@ -26,7 +26,8 @@ impl RoutingTable for Router {
     fn dec_connect_counter(&self, connection: Connection) {
         // decrement active_connections counter
         let mut active_cons = self[connection].active_connections.lock().unwrap();
-        *active_cons += 1;
+        *active_cons -= 1;
+        info!("active connections after decrement: {active_cons}");
     }
 }
 
@@ -42,9 +43,9 @@ pub struct ModuleInTX {
     pub send: Sender<Float>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ModuleIn {
-    pub active_connections: Mutex<NConnections>,
+    pub active_connections: Arc<Mutex<NConnections>>,
     pub input: ModuleInRX,
     pub output: ModuleInTX,
 }
@@ -52,11 +53,11 @@ pub struct ModuleIn {
 impl ModuleIn {
     pub fn new() -> Self {
         // change to bounded(0) if there are messaging problems or latency/syncronization issues
-        let (i_tx_i, i_rx_i): (Sender<Float>, Receiver<Float>) = bounded(0);
-        let (i_tx_o, i_rx_o): (Sender<()>, Receiver<()>) = bounded(0);
+        let (i_tx_i, i_rx_i): (Sender<Float>, Receiver<Float>) = unbounded();
+        let (i_tx_o, i_rx_o): (Sender<()>, Receiver<()>) = unbounded();
 
         ModuleIn {
-            active_connections: Mutex::new(0),
+            active_connections: Arc::new(Mutex::new(0)),
             input: ModuleInRX {
                 recv: i_rx_i,
                 send: i_tx_o,
@@ -94,7 +95,7 @@ pub struct Modules {
 // }
 
 pub fn router_send_sample(router: Router, con: Connection, value: Float) -> Option<()> {
-    if let Err(e) = router
+    while let Err(e) = router
         .get(con.dest_module as usize)?
         .get(con.dest_input as usize)?
         .output
@@ -105,41 +106,56 @@ pub fn router_send_sample(router: Router, con: Connection, value: Float) -> Opti
             "could not send sample to input: {}, of module: {}. got error: {e}",
             con.dest_input, con.dest_module
         );
-    };
+    }
 
     Some(())
 }
 
 pub fn router_read_sample(input: &ModuleInRX) -> Float {
-    input.recv.recv().unwrap_or(0.0)
+    loop {
+        match input.recv.recv() {
+            Ok(sample) => break sample,
+            Err(e) => error!("failed to recv sample with error: {e}"),
+        }
+    } // .unwrap_or(0.0)
 }
 
 pub fn router_send_sync(input: &ModuleInRX) {
-    // make receiver for this a mutex and send this sync n times where n in the number of active
-    // connections
-    if let Err(e) = input.send.send(()) {
+    // info!("sending sync");
+
+    while let Err(e) = input.send.send(()) {
         error!("coulnd not send sync signal. failed with error {e}");
     }
 }
 
 pub fn router_read_sync(router: Router, con: Connection) -> anyhow::Result<()> {
-    Ok(router
-        .get(con.dest_module as usize)
-        .map_or_else(|| bail!("unkown module {}", con.dest_module), |f| Ok(f))?
-        .get(con.dest_input as usize)
-        .map_or_else(
-            || {
-                bail!(
-                    "unkown input: {} on module {}",
-                    con.dest_input,
-                    con.dest_module
-                )
-            },
-            |f| Ok(f),
-        )?
-        .output
-        .recv
-        .recv()?)
+    for _ in 0..1_000_000 {
+        if let Ok(_) = router
+            .get(con.dest_module as usize)
+            .map_or_else(|| bail!("unkown module {}", con.dest_module), |f| Ok(f))?
+            .get(con.dest_input as usize)
+            .map_or_else(
+                || {
+                    bail!(
+                        "unkown input: {} on module {}",
+                        con.dest_input,
+                        con.dest_module
+                    )
+                },
+                |f| Ok(f),
+            )?
+            .output
+            .recv
+            .try_recv()
+        {
+            return Ok(());
+            //     error!("failed to read sync with error {e}");
+            // } else {
+            //     return Ok(());
+        }
+    }
+
+    bail!("could not read sync signal in time");
 }
 
 pub fn mk_module_ins(n: usize) -> ModuleIns {
