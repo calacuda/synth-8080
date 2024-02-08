@@ -56,7 +56,7 @@ impl Osc for Oscilator {
         };
         // info!("{sample} => {:?}", sample as Float);
 
-        sample as Float
+        sample.tanh() as Float
     }
 
     fn set_frequency(&mut self, frequency: Float) {

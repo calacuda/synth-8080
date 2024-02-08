@@ -43,6 +43,7 @@ impl Iterator for Audio {
                 router_read_sample(&input)
             })
             .sum();
+        // info!("sample => {sample}");
 
         Some(sample.tanh() as f32)
     }

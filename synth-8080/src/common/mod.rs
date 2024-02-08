@@ -155,10 +155,10 @@ pub struct Connection {
     pub dest_admin: bool,
 }
 
-pub struct IO {
-    pub inputs: Vec<(ModuleIn, Box<dyn FnMut(&[Float])>)>,
-    pub outputs: Vec<(Arc<Mutex<Vec<Connection>>>, Box<dyn FnMut() -> Float>)>,
-}
+// pub struct IO {
+//     pub inputs: Vec<(ModuleIn, Box<dyn FnMut(&[Float])>)>,
+//     pub outputs: Vec<(Arc<Mutex<Vec<Connection>>>, Box<dyn FnMut() -> Float>)>,
+// }
 
 impl Index<Connection> for Router {
     type Output = ModuleIn;
@@ -210,7 +210,6 @@ pub fn sync_with_inputs(ins: &mut Vec<(&ModuleIn, Box<dyn FnMut(Vec<Float>) + Se
         let n_cons = *cons.active_connections.lock().unwrap();
         // info!("{n_cons} active connections");
 
-        // TODO: make this pull all samples regardless of n_cons
         if n_cons > 0 {
             // info!("syncing with input");
             // (0..n_cons).for_each(|_| router_send_sync(&cons.input));

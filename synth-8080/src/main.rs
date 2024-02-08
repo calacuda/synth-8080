@@ -47,6 +47,10 @@ async fn main() -> Result<()> {
         ModuleType::Lfo,
         ModuleType::Adbdr,
         ModuleType::Echo,
+        // ModuleType::Echo,
+        ModuleType::Adsr,
+        ModuleType::Vco,
+        ModuleType::Adbdr,
         ModuleType::Adsr,
     ];
 
@@ -60,7 +64,7 @@ async fn main() -> Result<()> {
     info!("{} modules made", ctrlr.modules.lock().unwrap().len());
     {
         let mut filter = ctrlr.envelope_type.lock().unwrap();
-        *filter = EnvelopeType::ADSR;
+        *filter = EnvelopeType::ADBDR;
     }
 
     // *** test trem & vibrato *** //
@@ -82,15 +86,15 @@ async fn main() -> Result<()> {
     // connect vco to adbdr
     ctrlr.connect(1, 0, 3, adbdr::AUDIO_IN)?;
     // connect adbdr to output
-    // ctrlr.connect(3, 0, 0, 0)?;
+    ctrlr.connect(3, 0, 0, 0)?;
     // connect adbdr to echo
     // ctrlr.connect(3, 0, 4, echo::AUDIO_INPUT)?;
     // connect echo to output
     // ctrlr.connect(4, 0, 0, 0)?;
     // connect vco to adsr
-    ctrlr.connect(1, 0, 5, adsr::AUDIO_IN)?;
+    // ctrlr.connect(1, 0, 5, adsr::AUDIO_IN)?;
     // connect adsr to output
-    ctrlr.connect(5, 0, 0, 0)?;
+    // ctrlr.connect(5, 0, 0, 0)?;
 
     // info!("info => {}", ctrlr.module);
     ctrlr.start().await?;

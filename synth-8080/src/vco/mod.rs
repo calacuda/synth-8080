@@ -49,6 +49,7 @@ pub struct Vco {
 impl Vco {
     pub fn new(routing_table: Router, id: u8) -> Self {
         let osc_type = Arc::new(Mutex::new(OscType::Sine));
+        // TODO: test wavetable
         let osc = Arc::new(Mutex::new(Oscilator::new()));
         let outputs = Arc::new(Mutex::new(Vec::new()));
         let volume_in = Arc::new(Mutex::new(1.0));

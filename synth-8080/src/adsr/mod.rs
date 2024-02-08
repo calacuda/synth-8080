@@ -6,7 +6,6 @@ use crate::{
 use anyhow::{ensure, Result};
 use std::sync::{Arc, Mutex};
 use tokio::task::{spawn, JoinHandle};
-use tracing::info;
 
 pub const N_INPUTS: u8 = 5;
 pub const N_OUTPUTS: u8 = 1;

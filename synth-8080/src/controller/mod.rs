@@ -116,6 +116,8 @@ impl OscilatorId {
             );
         });
 
+        info!("{mod_type_map:?}");
+
         mod_type_map
             .get(&ModuleType::Vco)
             .unwrap()
