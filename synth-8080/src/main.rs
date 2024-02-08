@@ -41,30 +41,52 @@ async fn main() -> Result<()> {
     info!("synth begin");
 
     // TODO: read config
-    let modules = [ModuleType::Output, ModuleType::Vco, ModuleType::Lfo];
+    let modules = [
+        ModuleType::Output,
+        ModuleType::Vco,
+        ModuleType::Lfo,
+        ModuleType::Adbdr,
+        ModuleType::Echo,
+    ];
 
     let ctrlr = controller::Controller::new(&modules).await?;
     info!("{} modules made", ctrlr.modules.lock().unwrap().len());
-
-    ctrlr.connect(1, 0, 0, 0)?;
-    // connect LFO to VCO volume input
+    // *** test trem & vibrato *** //
+    // ctrlr.connect(1, 0, 0, 0)?;
+    // // connect LFO to VCO volume input
+    // // ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
+    // // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+    // sleep(Duration::from_secs_f64(1.0)).await;
     // ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
+    // // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+    // sleep(Duration::from_secs_f64(2.0)).await;
+    // info!("disconnecting trem");
+    // ctrlr.disconnect(2, 0, 1, vco::VOLUME_INPUT)?;
+    // sleep(Duration::from_secs_f64(1.0)).await;
     // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
-    sleep(Duration::from_secs_f64(1.0)).await;
-    ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
-    // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
-    sleep(Duration::from_secs_f64(2.0)).await;
-    info!("disconnecting trem");
-    ctrlr.disconnect(2, 0, 1, vco::VOLUME_INPUT)?;
-    sleep(Duration::from_secs_f64(1.0)).await;
-    ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+
+    // connect vco to output directly
+    // ctrlr.connect(1, 0, 0, 0)?;
+    // connect vco to adbdr
+    ctrlr.connect(1, 0, 3, adbdr::AUDIO_IN)?;
+    // connect adbdr to output
+    ctrlr.connect(3, 0, 0, 0)?;
+    // connect adbdr to echo
+    // ctrlr.connect(3, 0, 4, echo::AUDIO_INPUT)?;
+    // connect echo to output
+    // ctrlr.connect(4, 0, 0, 0)?;
 
     // info!("info => {}", ctrlr.module);
     ctrlr.start().await?;
     // sleep(Duration::from_secs(2)).await;
 
     warn!("about to stop syntheses");
-    ctrlr.handles.iter().for_each(|handle| handle.abort());
+    ctrlr
+        .handles
+        .lock()
+        .unwrap()
+        .iter()
+        .for_each(|handle| handle.abort());
     info!("syntheses stopped");
 
     Ok(())

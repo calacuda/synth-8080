@@ -40,6 +40,7 @@
             # cargo-watch
             # rust-analyzer
             alsa-lib
+            libudev-zero
           ];
         };
       });

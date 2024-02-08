@@ -93,6 +93,7 @@ impl Module for Echo {
         Ok(spawn(async move {
             // prepare call back for event loop
             let ins: &Vec<ModuleIn> = (*router)
+                .0
                 .get(id)
                 .expect("this Echo module was not found in the routing table struct.")
                 .as_ref();
@@ -117,7 +118,7 @@ impl Module for Echo {
                 Box::new(move |samples: Vec<Float>| {
                     // let mut b = bend.lock().unwrap();
                     let time = samples.iter().sum::<Float>() / (samples.len() as Float);
-                    buff_3.lock().unwrap().set_speed(time);
+                    buff_3.lock().unwrap().set_volume(time);
                 });
 
             let inputs = vec![

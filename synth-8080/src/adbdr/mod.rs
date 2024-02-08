@@ -33,38 +33,78 @@ pub struct ADBDREnvelope {
     phase: Phase,
     // i: usize,
     env: Float,
-    pub decay: Float,
+    pub decay_1_speed: Float,
+    pub decay_2_speed: Float,
+    pub attack_speed: Float,
+    pub threshold: Float,
+    pub decay_1: Float,
     pub decay_2: Float,
     pub attack: Float,
-    pub threshold: Float,
+    pub release: Float,
     sample_rate: Float,
+    pub pressed: bool,
+    release_threshold: Float,
 }
 
 impl ADBDREnvelope {
     pub fn new() -> Self {
+        let sample_rate = SAMPLE_RATE as Float;
+        let attack_speed = 0.01;
+        let attack = 1.0 / (sample_rate * attack_speed);
+        let decay_1_speed = 0.1;
+        let decay_1 = -1.0 / (sample_rate * decay_1_speed);
+        let decay_2_speed = 20.0;
+        let decay_2 = -1.0 / (sample_rate * decay_2_speed);
+
         Self {
             // pressed: false,
             phase: Phase::Neutural,
             // i: 0,
             env: 0.0,
-            decay: 0.0,
-            decay_2: 0.0,
-            attack: 0.0,
-            threshold: 0.5,
-            sample_rate: SAMPLE_RATE as Float,
+            decay_1,
+            decay_2,
+            attack,
+            threshold: 0.9,
+            sample_rate,
+            attack_speed,
+            decay_1_speed,
+            decay_2_speed,
+            release: -1.0 / (sample_rate * 0.0001),
+            pressed: false,
+            release_threshold: 0.05,
         }
     }
 
     // fn atk_shift(&mut self) -> Float {
     //     1.0 / (self.sample_rate * self.attack)
     // }
+    fn set_attack(&mut self, atk_speed: Float) {
+        if atk_speed != self.attack_speed {
+            self.attack_speed = atk_speed;
+            self.attack = 1.0 / (self.sample_rate * atk_speed);
+        }
+    }
+
+    fn set_decay_1(&mut self, decay_1_speed: Float) {
+        if decay_1_speed != self.attack_speed {
+            self.decay_1_speed = decay_1_speed;
+            self.attack = -1.0 / (self.sample_rate * decay_1_speed);
+        }
+    }
+
+    fn set_decay_2(&mut self, decay_2_speed: Float) {
+        if decay_2_speed != self.attack_speed {
+            self.decay_2_speed = decay_2_speed;
+            self.attack = -(1.0 - self.release_threshold) / (self.sample_rate * decay_2_speed);
+        }
+    }
 
     pub fn step(&mut self) -> Float {
         self.env += match self.phase {
-            Phase::Attack => 1.0 / (self.sample_rate * self.attack),
-            Phase::Decay1 => 1.0 / (self.sample_rate * self.decay),
-            Phase::Decay2 => 1.0 / (self.sample_rate * self.decay_2),
-            Phase::Release => 1.0 / (self.sample_rate * 0.1),
+            Phase::Attack => self.attack,
+            Phase::Decay1 => self.decay_1,
+            Phase::Decay2 => self.decay_2,
+            Phase::Release => self.release,
             Phase::Neutural => 0.0,
         };
 
@@ -76,21 +116,19 @@ impl ADBDREnvelope {
 
     fn update_phase(&mut self) {
         if self.phase == Phase::Attack && self.env >= 1.0 {
-            // info!("1");
             self.phase = Phase::Decay1;
             self.env = 1.0;
-            // self.i = 0;
+            // info!("chaning phase to => {:?}", self.phase);
         } else if self.phase == Phase::Decay1 && self.env <= self.threshold {
-            // info!("2");
             self.phase = Phase::Decay2;
-            // self.i = 0;
-        } else if self.phase == Phase::Decay2 && self.env <= 0.1 {
-            // info!("3");
+            // info!("chaning phase to => {:?}", self.phase);
+        } else if self.phase == Phase::Decay2 && self.env <= self.release_threshold {
             self.phase = Phase::Release;
-            // self.i = 0;
+            // info!("chaning phase to => {:?}", self.phase);
         } else if self.phase == Phase::Release && self.env <= 0.0 {
             self.phase = Phase::Neutural;
             self.env = 0.0;
+            // info!("chaning phase to => {:?}", self.phase);
         }
     }
 }
@@ -137,6 +175,7 @@ impl Module for ADBDRModule {
         Ok(spawn(async move {
             // prepare call back for event loop
             let ins: &Vec<ModuleIn> = (*router)
+                .0
                 .get(id)
                 .expect("this ADBDR Envelope Module was not found in the routing table struct.")
                 .as_ref();
@@ -149,19 +188,19 @@ impl Module for ADBDRModule {
                 Box::new(move |samples: Vec<Float>| {
                     let atk = samples.iter().sum::<Float>() / (samples.len() as Float);
                     let mut e = env_2.lock().unwrap();
-                    (*e).attack = atk;
+                    (*e).set_attack(atk);
                 });
             let set_decay_1: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     let decay = samples.iter().sum::<Float>() / (samples.len() as Float);
                     let mut e = env_3.lock().unwrap();
-                    (*e).decay = decay;
+                    (*e).set_decay_1(decay);
                 });
             let set_decay_2: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     let decay = samples.iter().sum::<Float>() / (samples.len() as Float);
                     let mut e = env_4.lock().unwrap();
-                    (*e).decay_2 = decay;
+                    (*e).set_decay_2(decay);
                 });
             let set_decay_threshold: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
@@ -173,10 +212,16 @@ impl Module for ADBDRModule {
                 Box::new(move |samples: Vec<Float>| {
                     let in_val = samples.iter().sum::<Float>() / (samples.len() as Float);
                     let mut e = env_6.lock().unwrap();
-                    if e.phase != Phase::Release && e.phase != Phase::Neutural && in_val >= 7.5 {
+
+                    // info!("set_pressed => in_val {in_val}, phase => {:?}", e.phase);
+                    if e.pressed && in_val <= 0.75 {
+                        // info!("release");
                         (*e).phase = Phase::Release;
-                    } else if e.phase == Phase::Neutural && in_val <= 7.5 {
+                        (*e).pressed = false;
+                    } else if !e.pressed && e.phase == Phase::Neutural && in_val >= 0.75 {
+                        // info!("pressed");
                         (*e).phase = Phase::Attack;
+                        (*e).pressed = true;
                     }
                 });
             let set_audio: Box<dyn FnMut(Vec<Float>) + Send> =

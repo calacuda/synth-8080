@@ -7,6 +7,7 @@ use std::{ops::Deref, thread::sleep, time::Duration};
 use tokio::spawn;
 use tracing::info;
 
+// TODO: Add a volume input to output
 pub const N_INPUTS: u8 = 1;
 pub const N_OUTPUTS: u8 = 0;
 
@@ -26,7 +27,7 @@ impl Iterator for Audio {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let input = &self.router.deref()[self.id][0].input;
+        let input = &self.router.deref().0[self.id][0].input;
         router_send_sync(input);
         // info!("sync sent");
         let sample = router_read_sample(input);

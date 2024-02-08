@@ -8,6 +8,12 @@
 5. [ ] write other modules
     - [x] ADBDR
     - [ ] ADSR
+    - [ ] AHDSR
+    - [ ] ADSR
+    - [ ] AD
+    - [ ] AR
+    - [ ] ADR
+    <!-- - [ ] ADS -->
     - [ ] Audio In
     - [ ] Chorus
     <!-- - [ ] Delay -->

@@ -37,7 +37,7 @@ impl Oscilator {
 
 impl Osc for Oscilator {
     fn get_sample(&mut self) -> Float {
-        let samples: Vec<f32> = if self.overtones {
+        let sample: f32 = if self.overtones {
             // info!("overtones => {}", self.volume);
             self.piano
                 .iter_mut()
@@ -47,16 +47,16 @@ impl Osc for Oscilator {
                     // Get next sample from oscillator.
                     let sample = o.step(self.frequency * (i + 1) as f32);
                     // Pan the generated harmonic center
-                    Gain.step(sample, (v * self.volume).into()).to_f32()
+                    Gain.step(sample, (*v * self.volume).into()).to_f32()
                 })
-                .collect()
+                .sum::<f32>()
         } else {
-            let sample = self.piano[0].step(self.frequency);
-            vec![Gain.step(sample, self.volume.into()).to_f32()]
+            Gain.step(self.piano[0].step(self.frequency), self.volume.into())
+                .to_f32()
         };
-        // info!("{:?}", samples.iter().sum::<f32>() as Float);
+        // info!("{sample} => {:?}", sample as Float);
 
-        samples.iter().sum::<f32>() as Float
+        sample as Float
     }
 
     fn set_frequency(&mut self, frequency: Float) {

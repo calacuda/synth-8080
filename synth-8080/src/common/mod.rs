@@ -1,5 +1,5 @@
 use crate::{
-    echo, lfo, output,
+    adbdr, echo, lfo, output,
     router::{
         mk_module_ins, router_read_sample, router_read_sync, router_send_sample, router_send_sync,
         ModuleIn, ModuleIns, Router,
@@ -12,19 +12,17 @@ use std::{
     ops::{Deref, Index},
     sync::{Arc, Mutex},
 };
-use tokio::{
-    task::JoinHandle,
-    time::{sleep, Duration},
-};
+use tokio::task::JoinHandle;
 use tracing::{error, info};
 
 pub mod notes;
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModuleType {
     Vco,
     Output,
     Lfo,
     Echo,
+    Adbdr,
 }
 
 impl ModuleType {
@@ -37,6 +35,7 @@ impl ModuleType {
             ModuleType::Output => Box::new(output::Output::new(routing_table, id).await),
             ModuleType::Lfo => Box::new(lfo::Lfo::new(routing_table, id)),
             ModuleType::Echo => Box::new(echo::Echo::new(routing_table, id)),
+            ModuleType::Adbdr => Box::new(adbdr::ADBDRModule::new(routing_table, id)),
         };
 
         info!("made a {self:?} module");
@@ -47,32 +46,78 @@ impl ModuleType {
         module
     }
 
-    pub fn get_info(&self) -> ModuleInfo {
+    pub fn get_info(&self) -> (ModuleInfo, ModuleInfo) {
         match self {
-            ModuleType::Vco => ModuleInfo {
-                n_ins: vco::N_INPUTS,
-                n_outs: vco::N_OUTPUTS,
-                io: mk_module_ins(vco::N_INPUTS as usize),
-                mod_type: *self,
-            },
-            ModuleType::Output => ModuleInfo {
-                n_ins: output::N_INPUTS,
-                n_outs: output::N_OUTPUTS,
-                io: mk_module_ins(output::N_INPUTS as usize),
-                mod_type: *self,
-            },
-            ModuleType::Lfo => ModuleInfo {
-                n_ins: lfo::N_INPUTS,
-                n_outs: lfo::N_OUTPUTS,
-                io: mk_module_ins(lfo::N_INPUTS as usize),
-                mod_type: *self,
-            },
-            ModuleType::Echo => ModuleInfo {
-                n_ins: echo::N_INPUTS,
-                n_outs: echo::N_OUTPUTS,
-                io: mk_module_ins(echo::N_INPUTS as usize),
-                mod_type: *self,
-            },
+            ModuleType::Vco => (
+                ModuleInfo {
+                    n_ins: vco::N_INPUTS,
+                    n_outs: vco::N_OUTPUTS,
+                    io: mk_module_ins(vco::N_INPUTS as usize),
+                    mod_type: *self,
+                },
+                ModuleInfo {
+                    n_ins: vco::N_OUTPUTS,
+                    n_outs: vco::N_INPUTS,
+                    io: mk_module_ins(vco::N_OUTPUTS as usize),
+                    mod_type: *self,
+                },
+            ),
+            ModuleType::Output => (
+                ModuleInfo {
+                    n_ins: output::N_INPUTS,
+                    n_outs: output::N_OUTPUTS,
+                    io: mk_module_ins(output::N_INPUTS as usize),
+                    mod_type: *self,
+                },
+                ModuleInfo {
+                    n_ins: output::N_OUTPUTS,
+                    n_outs: output::N_INPUTS,
+                    io: mk_module_ins(output::N_OUTPUTS as usize),
+                    mod_type: *self,
+                },
+            ),
+            ModuleType::Lfo => (
+                ModuleInfo {
+                    n_ins: lfo::N_INPUTS,
+                    n_outs: lfo::N_OUTPUTS,
+                    io: mk_module_ins(lfo::N_INPUTS as usize),
+                    mod_type: *self,
+                },
+                ModuleInfo {
+                    n_ins: lfo::N_OUTPUTS,
+                    n_outs: lfo::N_INPUTS,
+                    io: mk_module_ins(lfo::N_OUTPUTS as usize),
+                    mod_type: *self,
+                },
+            ),
+            ModuleType::Echo => (
+                ModuleInfo {
+                    n_ins: echo::N_INPUTS,
+                    n_outs: echo::N_OUTPUTS,
+                    io: mk_module_ins(echo::N_INPUTS as usize),
+                    mod_type: *self,
+                },
+                ModuleInfo {
+                    n_ins: echo::N_OUTPUTS,
+                    n_outs: echo::N_INPUTS,
+                    io: mk_module_ins(echo::N_OUTPUTS as usize),
+                    mod_type: *self,
+                },
+            ),
+            ModuleType::Adbdr => (
+                ModuleInfo {
+                    n_ins: adbdr::N_INPUTS,
+                    n_outs: adbdr::N_OUTPUTS,
+                    io: mk_module_ins(adbdr::N_INPUTS as usize),
+                    mod_type: *self,
+                },
+                ModuleInfo {
+                    n_ins: adbdr::N_OUTPUTS,
+                    n_outs: adbdr::N_INPUTS,
+                    io: mk_module_ins(adbdr::N_OUTPUTS as usize),
+                    mod_type: *self,
+                },
+            ),
         }
     }
 }
@@ -90,6 +135,8 @@ pub struct Connection {
     pub src_output: u8,
     pub dest_module: u8,
     pub dest_input: u8,
+    pub src_admin: bool,
+    pub dest_admin: bool,
 }
 
 pub struct IO {
@@ -101,7 +148,13 @@ impl Index<Connection> for Router {
     type Output = ModuleIn;
 
     fn index(&self, index: Connection) -> &Self::Output {
-        &self.deref()[index.dest_module as usize][index.dest_input as usize]
+        let r = if index.dest_admin {
+            &self.deref().1
+        } else {
+            &self.deref().0
+        };
+
+        &r[index.dest_module as usize][index.dest_input as usize]
     }
 }
 
@@ -141,6 +194,7 @@ pub fn sync_with_inputs(ins: &mut Vec<(&ModuleIn, Box<dyn FnMut(Vec<Float>) + Se
         let n_cons = *cons.active_connections.lock().unwrap();
         // info!("{n_cons} active connections");
 
+        // TODO: make this pull all samples regardless of n_cons
         if n_cons > 0 {
             // info!("syncing with input");
             // (0..n_cons).for_each(|_| router_send_sync(&cons.input));
@@ -173,6 +227,7 @@ pub fn send_samples(
 ) {
     outs.iter_mut().for_each(|(cons, f)| {
         let sample = f();
+        // info!("sample {sample}");
 
         cons.lock().unwrap().iter().for_each(|con| {
             // info!("about to read sync");

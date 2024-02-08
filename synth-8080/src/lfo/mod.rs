@@ -1,18 +1,15 @@
 use crate::{
-    common::{event_loop, send_samples, sync_with_inputs, Connection, Module},
+    common::{event_loop, Connection, Module},
     osc::{OscType, Oscilator},
     router::{ModuleIn, Router},
     Float,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use std::{
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
 };
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::{sleep, Duration},
-};
+use tokio::task::{spawn, JoinHandle};
 use tracing::info;
 
 pub const N_INPUTS: u8 = 3;
@@ -148,6 +145,7 @@ impl Lfo {
         spawn(async move {
             // prepare call back for event loop
             let ins: &Vec<ModuleIn> = (*router)
+                .0
                 .get(id)
                 .expect("this LFO Module was not found in the routing table struct.")
                 .as_ref();

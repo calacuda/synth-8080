@@ -60,9 +60,9 @@ impl Vco {
         let bend_amt = Arc::new(bend_range());
 
         // DEBUG
-        osc.lock().unwrap().set_frequency(Note::A4.into());
+        // osc.lock().unwrap().set_frequency(Note::A4.into());
         // osc.lock().unwrap().set_overtones(true);
-        // osc.lock().unwrap().set_waveform(OscType::Triangle);
+        osc.lock().unwrap().set_waveform(OscType::Triangle);
 
         Self {
             routing_table,
@@ -159,10 +159,12 @@ impl Vco {
         let id = self.id as usize;
         let pitch = self.pitch_in.clone();
         let osc_2 = self.osc.clone();
+        let osc_3 = self.osc.clone();
 
         spawn(async move {
             // prepare call back for event loop
             let ins: &Vec<ModuleIn> = (*router)
+                .0
                 .get(id)
                 .expect("this VCO Module was not found in the routing table struct.")
                 .as_ref();
@@ -180,8 +182,12 @@ impl Vco {
                 });
             let set_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
+                    // info!("got pitches");
                     let mut p = pitch.lock().unwrap();
                     *p = samples[samples.len() - 1];
+                    let mut osc = osc_3.lock().unwrap();
+                    (*osc).set_frequency(*p);
+                    // info!("setting pitch to {p}");
                 });
             let bend_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {

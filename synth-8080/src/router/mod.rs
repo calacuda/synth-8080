@@ -7,7 +7,12 @@ use tracing::{error, info};
 pub type NConnections = u8;
 pub type ModuleIns = Vec<ModuleIn>;
 pub type AllInputs = Vec<ModuleIns>;
-pub type Router = Arc<AllInputs>;
+
+pub type AdminModuleIns = Vec<AdminModuleIn>;
+pub type AllAdminInputs = Vec<AdminModuleIns>;
+
+// pub type Router = Arc<(AllInputs, AllAdminInputs)>;
+pub type Router = Arc<(AllInputs, AllInputs)>;
 
 pub trait RoutingTable {
     /// used to make the connection described by the `connection` param.
@@ -21,13 +26,14 @@ impl RoutingTable for Router {
         // increment active_connection counter
         let mut active_cons = self[connection].active_connections.lock().unwrap();
         *active_cons += 1;
+        info!("incremented the active connection counter for connection: {connection:?}");
     }
 
     fn dec_connect_counter(&self, connection: Connection) {
         // decrement active_connections counter
         let mut active_cons = self[connection].active_connections.lock().unwrap();
         *active_cons -= 1;
-        info!("active connections after decrement: {active_cons}");
+        // info!("active connections after decrement: {active_cons}");
     }
 }
 
@@ -70,6 +76,33 @@ impl ModuleIn {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct AdminModuleIn {
+    pub active_connections: Arc<Mutex<NConnections>>,
+    pub input: ModuleInTX,
+    pub output: ModuleInRX,
+}
+
+impl AdminModuleIn {
+    pub fn new() -> Self {
+        // change to bounded(0) if there are messaging problems or latency/syncronization issues
+        let (i_tx_i, i_rx_i): (Sender<Float>, Receiver<Float>) = unbounded();
+        let (i_tx_o, i_rx_o): (Sender<()>, Receiver<()>) = unbounded();
+
+        AdminModuleIn {
+            active_connections: Arc::new(Mutex::new(0)),
+            output: ModuleInRX {
+                recv: i_rx_i,
+                send: i_tx_o,
+            },
+            input: ModuleInTX {
+                recv: i_rx_o,
+                send: i_tx_i,
+            },
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Modules {
     // pub adbdr: Vec<crate::adbdr::ADBDR>,
@@ -96,6 +129,7 @@ pub struct Modules {
 
 pub fn router_send_sample(router: Router, con: Connection, value: Float) -> Option<()> {
     while let Err(e) = router
+        .0
         .get(con.dest_module as usize)?
         .get(con.dest_input as usize)?
         .output
@@ -113,6 +147,7 @@ pub fn router_send_sample(router: Router, con: Connection, value: Float) -> Opti
 
 pub fn router_read_sample(input: &ModuleInRX) -> Float {
     loop {
+        // TODO: consider making this recv ALL samples in the channel (might not be nesseary tho)
         match input.recv.recv() {
             Ok(sample) => break sample,
             Err(e) => error!("failed to recv sample with error: {e}"),
@@ -129,8 +164,9 @@ pub fn router_send_sync(input: &ModuleInRX) {
 }
 
 pub fn router_read_sync(router: Router, con: Connection) -> anyhow::Result<()> {
-    for _ in 0..1_000_000 {
+    for _ in 0..1_000_000_000 {
         if let Ok(_) = router
+            .0
             .get(con.dest_module as usize)
             .map_or_else(|| bail!("unkown module {}", con.dest_module), |f| Ok(f))?
             .get(con.dest_input as usize)
@@ -160,4 +196,8 @@ pub fn router_read_sync(router: Router, con: Connection) -> anyhow::Result<()> {
 
 pub fn mk_module_ins(n: usize) -> ModuleIns {
     (0..n).into_iter().map(|_| ModuleIn::new()).collect()
+}
+
+pub fn mk_admin_module_ins(n: usize) -> AdminModuleIns {
+    (0..n).into_iter().map(|_| AdminModuleIn::new()).collect()
 }
