@@ -26,7 +26,7 @@ impl RoutingTable for Router {
         // increment active_connection counter
         let mut active_cons = self[connection].active_connections.lock().unwrap();
         *active_cons += 1;
-        info!("incremented the active connection counter for connection: {connection:?}");
+        // info!("incremented the active connection counter for connection: {connection:?}");
     }
 
     fn dec_connect_counter(&self, connection: Connection) {

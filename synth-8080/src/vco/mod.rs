@@ -224,14 +224,14 @@ impl Module for Vco {
     fn connect(&self, connection: Connection) -> anyhow::Result<()> {
         self.connect_auido_out_to(connection)?;
         // self.routing_table.inc_connect_counter(connection);
-        info!("connecting: {connection:?}");
+        // info!("connecting: {connection:?}");
 
         Ok(())
     }
 
     fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
         self.disconnect_from(connection)?;
-        info!("disconnecting: {connection:?}");
+        // info!("disconnecting: {connection:?}");
 
         Ok(())
     }

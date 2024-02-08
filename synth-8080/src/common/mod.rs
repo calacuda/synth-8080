@@ -1,5 +1,5 @@
 use crate::{
-    adbdr, echo, lfo, output,
+    adbdr, adsr, echo, lfo, output,
     router::{
         mk_module_ins, router_read_sample, router_read_sync, router_send_sample, router_send_sync,
         ModuleIn, ModuleIns, Router,
@@ -23,6 +23,7 @@ pub enum ModuleType {
     Lfo,
     Echo,
     Adbdr,
+    Adsr,
 }
 
 impl ModuleType {
@@ -36,6 +37,7 @@ impl ModuleType {
             ModuleType::Lfo => Box::new(lfo::Lfo::new(routing_table, id)),
             ModuleType::Echo => Box::new(echo::Echo::new(routing_table, id)),
             ModuleType::Adbdr => Box::new(adbdr::ADBDRModule::new(routing_table, id)),
+            ModuleType::Adsr => Box::new(adsr::ADSRModule::new(routing_table, id)),
         };
 
         info!("made a {self:?} module");
@@ -115,6 +117,20 @@ impl ModuleType {
                     n_ins: adbdr::N_OUTPUTS,
                     n_outs: adbdr::N_INPUTS,
                     io: mk_module_ins(adbdr::N_OUTPUTS as usize),
+                    mod_type: *self,
+                },
+            ),
+            ModuleType::Adsr => (
+                ModuleInfo {
+                    n_ins: adsr::N_INPUTS,
+                    n_outs: adsr::N_OUTPUTS,
+                    io: mk_module_ins(adsr::N_INPUTS as usize),
+                    mod_type: *self,
+                },
+                ModuleInfo {
+                    n_ins: adsr::N_OUTPUTS,
+                    n_outs: adsr::N_INPUTS,
+                    io: mk_module_ins(adsr::N_OUTPUTS as usize),
                     mod_type: *self,
                 },
             ),

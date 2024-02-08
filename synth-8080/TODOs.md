@@ -7,16 +7,9 @@
     - NOTE: uses a function that takes callbacks.
 5. [ ] write other modules
     - [x] ADBDR
-    - [ ] ADSR
-    - [ ] AHDSR
-    - [ ] ADSR
-    - [ ] AD
-    - [ ] AR
-    - [ ] ADR
-    <!-- - [ ] ADS -->
+    - [x] ADSR
     - [ ] Audio In
     - [ ] Chorus
-    <!-- - [ ] Delay -->
     - [x] Echo
     - [ ] Gain/Attenuator
     - [x] LFO

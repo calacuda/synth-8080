@@ -10,7 +10,7 @@ use serialport::SerialPort;
 use std::{
     collections::HashMap,
     io,
-    ops::{Deref, DerefMut, Index},
+    ops::Index,
     sync::{Arc, Mutex},
 };
 use tokio::{
@@ -23,10 +23,10 @@ use tracing::{error, info, trace, warn};
 #[derive(Clone, Copy, Debug)]
 pub enum EnvelopeType {
     ADBDR,
+    ADSR,
     // *** Not yet programmed *** //
 
     // AHDSR,
-    // ADSR,
     // AD, // maybe NOPE (replaced with adr to stop that anoying pop sound)
     // AR,
     // ADR,
@@ -37,12 +37,12 @@ pub enum EnvelopeType {
 pub struct EnvelopeFilters {
     /// the index of the adbdr envelope filter
     pub adbdr: usize,
+    /// the index of the adsr envelope filter
+    pub adsr: usize,
     // *** Not yet programmed *** //
 
     // /// the index of the ahdsr envelope filter
     // pub ahdsr: usize,
-    // /// the index of the adsr envelope filter
-    // pub adsr: usize,
     // /// the index of the ad envelope filter
     // pub ad: usize, // maybe NOPE (replaced with adr)
     // /// the index of the ar envelope filter
@@ -59,6 +59,9 @@ impl EnvelopeFilters {
             adbdr: mod_type_map
                 .get(&ModuleType::Adbdr)
                 .map_or_else(|| bail!("there were fewer ADBDR filters then VCO_s this is not currently supported."), |val| Ok(val[i]))?,
+            adsr: mod_type_map
+                .get(&ModuleType::Adsr)
+                .map_or_else(|| bail!("there were fewer ADSR filters then VCO_s this is not currently supported."), |val| Ok(val[i]))?,
         })
     }
 
@@ -73,6 +76,7 @@ impl Index<EnvelopeType> for EnvelopeFilters {
     fn index(&self, index: EnvelopeType) -> &Self::Output {
         match index {
             EnvelopeType::ADBDR => &self.adbdr,
+            EnvelopeType::ADSR => &self.adsr,
         }
     }
 }
@@ -98,7 +102,7 @@ impl OscilatorId {
     }
 
     pub fn new_s(mod_types: &[ModuleType]) -> Result<Vec<Self>> {
-        let env_type = [ModuleType::Vco, ModuleType::Adbdr];
+        let env_type = [ModuleType::Vco, ModuleType::Adbdr, ModuleType::Adsr];
         let mut mod_type_map: HashMap<ModuleType, Vec<usize>> = HashMap::new();
 
         env_type.iter().for_each(|mt| {
@@ -131,7 +135,6 @@ pub struct Controller {
     /// the liist of connections
     pub connections: Arc<Mutex<Vec<Connection>>>,
     /// the list of registered modules
-    // TODO: also store in a struc that sore the modules by type
     pub modules: Arc<Mutex<Vec<(ModuleInfo, Box<dyn Module>)>>>,
     /// a table representing all inputs of all modules
     pub routing_table: Router,
@@ -200,6 +203,7 @@ impl Controller {
 
     /// starts an event loop to listen for events over both serial and MIDI.
     pub fn start(&self) -> JoinHandle<()> {
+        info!("starting controller event loop");
         // TODO: trun LED red
 
         let port = self.serial.clone();
@@ -217,6 +221,7 @@ impl Controller {
         let filter_open = env_sample.clone();
 
         let (osc_id, env_id) = osc.lock().unwrap()[0].get(*env_type.lock().unwrap());
+        info!("osc id => {osc_id}, env id => {env_id}");
 
         let gen_env_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
             let sample = *env_sample.lock().unwrap();

@@ -86,16 +86,17 @@ impl ADBDREnvelope {
     }
 
     fn set_decay_1(&mut self, decay_1_speed: Float) {
-        if decay_1_speed != self.attack_speed {
+        if decay_1_speed != self.decay_1_speed {
             self.decay_1_speed = decay_1_speed;
-            self.attack = -1.0 / (self.sample_rate * decay_1_speed);
+            self.decay_1 = -1.0 / (self.sample_rate * decay_1_speed);
         }
     }
 
     fn set_decay_2(&mut self, decay_2_speed: Float) {
-        if decay_2_speed != self.attack_speed {
+        if decay_2_speed != self.decay_2_speed {
             self.decay_2_speed = decay_2_speed;
-            self.attack = -(1.0 - self.release_threshold) / (self.sample_rate * decay_2_speed);
+            self.decay_2 =
+                -(self.threshold - self.release_threshold) / (self.sample_rate * decay_2_speed);
         }
     }
 

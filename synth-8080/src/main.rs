@@ -1,8 +1,8 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use common::ModuleType;
+use controller::EnvelopeType;
 use std::mem;
-use tokio::time::{sleep, Duration};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 pub mod adbdr;
 pub mod adsr;
@@ -47,10 +47,22 @@ async fn main() -> Result<()> {
         ModuleType::Lfo,
         ModuleType::Adbdr,
         ModuleType::Echo,
+        ModuleType::Adsr,
     ];
 
-    let ctrlr = controller::Controller::new(&modules).await?;
+    let ctrlr = controller::Controller::new(&modules).await.map_or_else(
+        |e| {
+            error!("{e}");
+            bail!(e);
+        },
+        |c| Ok(c),
+    )?;
     info!("{} modules made", ctrlr.modules.lock().unwrap().len());
+    {
+        let mut filter = ctrlr.envelope_type.lock().unwrap();
+        *filter = EnvelopeType::ADSR;
+    }
+
     // *** test trem & vibrato *** //
     // ctrlr.connect(1, 0, 0, 0)?;
     // // connect LFO to VCO volume input
@@ -68,13 +80,17 @@ async fn main() -> Result<()> {
     // connect vco to output directly
     // ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
-    ctrlr.connect(1, 0, 3, adbdr::AUDIO_IN)?;
+    // ctrlr.connect(1, 0, 3, adbdr::AUDIO_IN)?;
     // connect adbdr to output
-    ctrlr.connect(3, 0, 0, 0)?;
+    // ctrlr.connect(3, 0, 0, 0)?;
     // connect adbdr to echo
     // ctrlr.connect(3, 0, 4, echo::AUDIO_INPUT)?;
     // connect echo to output
     // ctrlr.connect(4, 0, 0, 0)?;
+    // connect vco to adsr
+    ctrlr.connect(1, 0, 5, adsr::AUDIO_IN)?;
+    // connect adsr to output
+    ctrlr.connect(5, 0, 0, 0)?;
 
     // info!("info => {}", ctrlr.module);
     ctrlr.start().await?;
