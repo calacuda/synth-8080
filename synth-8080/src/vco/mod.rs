@@ -62,7 +62,7 @@ impl Vco {
         // DEBUG
         // osc.lock().unwrap().set_frequency(Note::A4.into());
         // osc.lock().unwrap().set_overtones(true);
-        osc.lock().unwrap().set_waveform(OscType::Triangle);
+        // osc.lock().unwrap().set_waveform(OscType::Triangle);
 
         Self {
             routing_table,
@@ -91,13 +91,13 @@ impl Vco {
         );
         self.outputs.lock().unwrap().push(connection);
 
-        info!(
-            "connected output: {}, of module: {}, to input: {}, of module: {}",
-            connection.src_output,
-            connection.src_module,
-            connection.dest_input,
-            connection.dest_module
-        );
+        // info!(
+        //     "connected output: {}, of module: {}, to input: {}, of module: {}",
+        //     connection.src_output,
+        //     connection.src_module,
+        //     connection.dest_input,
+        //     connection.dest_module
+        // );
 
         Ok(())
     }
@@ -107,12 +107,6 @@ impl Vco {
             connection.src_output < N_OUTPUTS,
             "invalid output selection"
         );
-
-        // if connection.src_output == VOLUME_INPUT {
-        // } else if connection.src_output == PITCH_INPUT || connection.src_output == PITCH_BEND_INPUT
-        // {
-        //     bail!("unhandled valid output selction. in other words a valid output was selected but that output handling code was not yet written.");
-        // }
         ensure!(
             self.outputs.lock().unwrap().contains(&connection),
             "module not connected"
@@ -177,7 +171,7 @@ impl Vco {
             let update_volume: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     let mut v = volume.lock().unwrap();
-                    let tmp_v = samples.iter().sum::<Float>() / (samples.len() as Float);
+                    let tmp_v = samples.iter().sum::<Float>().tanh();
                     *v = (tmp_v * 0.5) + 0.5;
                 });
             let set_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
@@ -192,7 +186,7 @@ impl Vco {
             let bend_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     // let mut b = bend.lock().unwrap();
-                    let bend = samples.iter().sum::<Float>() / (samples.len() as Float);
+                    let bend = samples.iter().sum::<Float>().tanh();
                     osc_2.lock().unwrap().apply_bend(bend);
                 });
             let inputs = vec![

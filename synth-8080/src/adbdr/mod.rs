@@ -227,7 +227,7 @@ impl Module for ADBDRModule {
                 });
             let set_audio: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
-                    let audio = samples.iter().sum::<Float>() / (samples.len() as Float);
+                    let audio = samples.iter().sum::<Float>().tanh();
                     let mut a = audio_2.lock().unwrap();
                     (*a) = audio;
                 });
@@ -257,13 +257,13 @@ impl Module for ADBDRModule {
         );
         self.outputs.lock().unwrap().push(connection);
 
-        info!(
-            "connected output: {}, of module: {}, to input: {}, of module: {}",
-            connection.src_output,
-            connection.src_module,
-            connection.dest_input,
-            connection.dest_module
-        );
+        // info!(
+        //     "connected output: {}, of module: {}, to input: {}, of module: {}",
+        //     connection.src_output,
+        //     connection.src_module,
+        //     connection.dest_input,
+        //     connection.dest_module
+        // );
 
         Ok(())
     }

@@ -103,21 +103,21 @@ impl AdminModuleIn {
     }
 }
 
-#[derive(Default)]
-pub struct Modules {
-    // pub adbdr: Vec<crate::adbdr::ADBDR>,
-    // pub adsr: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub audio_in: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub chorus: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub delay: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub echo: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub gain: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub lfo: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub mid_pass: Vec<(Vec<Input>, Vec<Output>)>,
-    pub output: Option<crate::output::Audio>,
-    // pub reverb: Vec<(Vec<Input>, Vec<Output>)>,
-    pub vco: Vec<crate::vco::Vco>,
-}
+// #[derive(Default)]
+// pub struct Modules {
+//     // pub adbdr: Vec<crate::adbdr::ADBDR>,
+//     // pub adsr: Vec<(Vec<Input>, Vec<Output>)>,
+//     // pub audio_in: Vec<(Vec<Input>, Vec<Output>)>,
+//     // pub chorus: Vec<(Vec<Input>, Vec<Output>)>,
+//     // pub delay: Vec<(Vec<Input>, Vec<Output>)>,
+//     // pub echo: Vec<(Vec<Input>, Vec<Output>)>,
+//     // pub gain: Vec<(Vec<Input>, Vec<Output>)>,
+//     // pub lfo: Vec<(Vec<Input>, Vec<Output>)>,
+//     // pub mid_pass: Vec<(Vec<Input>, Vec<Output>)>,
+//     pub output: Option<crate::output::Audio>,
+//     // pub reverb: Vec<(Vec<Input>, Vec<Output>)>,
+//     pub vco: Vec<crate::vco::Vco>,
+// }
 
 // impl Index<u8> for Modules {
 //     type Output = Box<dyn Module>;

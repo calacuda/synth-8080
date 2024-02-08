@@ -78,9 +78,9 @@ async fn main() -> Result<()> {
     // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
 
     // connect vco to output directly
-    // ctrlr.connect(1, 0, 0, 0)?;
+    ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
-    // ctrlr.connect(1, 0, 3, adbdr::AUDIO_IN)?;
+    ctrlr.connect(1, 0, 3, adbdr::AUDIO_IN)?;
     // connect adbdr to output
     // ctrlr.connect(3, 0, 0, 0)?;
     // connect adbdr to echo

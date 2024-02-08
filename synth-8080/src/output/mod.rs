@@ -1,6 +1,7 @@
 use crate::{
     common::{Connection, Module},
     router::{router_read_sample, router_send_sync, Router},
+    Float,
 };
 use rodio::{OutputStream, Source};
 use std::{ops::Deref, thread::sleep, time::Duration};
@@ -28,12 +29,22 @@ impl Iterator for Audio {
 
     fn next(&mut self) -> Option<Self::Item> {
         let input = &self.router.deref().0[self.id][0].input;
-        router_send_sync(input);
-        // info!("sync sent");
-        let sample = router_read_sample(input);
-        // info!("sample => {sample}");
+        let ins = &self.router.deref().0[self.id][0];
+        // router_send_sync(input);
+        // // info!("sync sent");
+        // let sample = router_read_sample(input);
+        // // info!("sample => {sample}");
+        let n_cons = ins.active_connections.lock().unwrap();
+        let sample: Float = (0..(*n_cons) as usize)
+            .map(|_i| {
+                router_send_sync(&input);
+                // info!("reading sample");
+                // read sample from connection
+                router_read_sample(&input)
+            })
+            .sum();
 
-        Some(sample as f32)
+        Some(sample.tanh() as f32)
     }
 }
 

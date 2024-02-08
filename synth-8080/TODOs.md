@@ -23,8 +23,9 @@
     - [x] triangle
     - [x] saw-tooth
     - [x] overtones oscilator
-6. [ ] finish controller
-7. [ ] write the code for the micro-controller to read the controlles
-8. [ ] add a "get state" http end point for the tauri app to query
-9. [ ] write tauri GUI front end
-10. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)
+7. [x] add tanh to all inputs that except mutiple signals.
+8. [ ] finish controller
+9. [ ] write the code for the micro-controller to read the controlles
+10. [ ] add a "get state" http end point for the tauri app to query
+11. [ ] write tauri GUI front end
+12. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)

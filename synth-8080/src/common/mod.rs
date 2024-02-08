@@ -217,7 +217,7 @@ pub fn sync_with_inputs(ins: &mut Vec<(&ModuleIn, Box<dyn FnMut(Vec<Float>) + Se
             // router_send_sync(&cons.input);
             // info!("synced with inputs");
 
-            let sample: Vec<Float> = (0..n_cons)
+            let samples: Vec<Float> = (0..n_cons)
                 .map(|_i| {
                     // send sync signal
                     router_send_sync(&cons.input);
@@ -228,7 +228,7 @@ pub fn sync_with_inputs(ins: &mut Vec<(&ModuleIn, Box<dyn FnMut(Vec<Float>) + Se
                 .collect();
 
             // if sample.len() > 0 {
-            f(sample);
+            f(samples);
             // }
         }
     })
