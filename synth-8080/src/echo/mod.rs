@@ -1,12 +1,11 @@
 use crate::{
     common::{event_loop, Connection, Module},
     router::{ModuleIn, Router},
-    Float, SAMPLE_RATE,
+    spawn, Float, JoinHandle, SAMPLE_RATE,
 };
-use anyhow::ensure;
+use anyhow::bail;
 use std::sync::{Arc, Mutex};
-use tokio::task::{spawn, JoinHandle};
-use tracing::info;
+// use tracing::*;
 
 pub const N_INPUTS: u8 = 3;
 pub const N_OUTPUTS: u8 = 1;
@@ -49,6 +48,9 @@ pub struct Echo {
     /// where the data from the audio input is stored
     pub audio_in: Arc<Mutex<Float>>,
     pub id: u8,
+    audio_cons: Arc<Mutex<Vec<Connection>>>,
+    speed_cons: Arc<Mutex<Vec<Connection>>>,
+    decay_cons: Arc<Mutex<Vec<Connection>>>,
 }
 
 impl Echo {
@@ -66,6 +68,9 @@ impl Echo {
         let audio_in = Arc::new(Mutex::new(0.0));
         // let time_in = Arc::new(Mutex::new(0.0));
         // let decay_in = Arc::new(Mutex::new(0.0));
+        let audio_cons = Arc::new(Mutex::new(Vec::new()));
+        let speed_cons = Arc::new(Mutex::new(Vec::new()));
+        let decay_cons = Arc::new(Mutex::new(Vec::new()));
 
         Self {
             routing_table,
@@ -75,13 +80,16 @@ impl Echo {
             // time_in,
             // decay_in,
             id,
+            audio_cons,
+            speed_cons,
+            decay_cons,
         }
     }
 }
 
 impl Module for Echo {
-    fn start(&self) -> anyhow::Result<JoinHandle<()>> {
-        let outs = self.outputs.clone();
+    fn start(&self) -> anyhow::Result<JoinHandle> {
+        // let outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let audio_in = self.audio_in.clone();
         let id = self.id as usize;
@@ -90,16 +98,21 @@ impl Module for Echo {
         let buff_3 = self.buff.clone();
         let audio_in_2 = self.audio_in.clone();
 
+        let audio_cons = self.audio_cons.clone();
+        let decay_cons = self.decay_cons.clone();
+        let speed_cons = self.speed_cons.clone();
+
         Ok(spawn(async move {
             // prepare call back for event loop
-            let ins: Arc<[ModuleIn]> = (*router)
-                .0
-                .get(id)
-                .expect("this Echo module was not found in the routing table struct.")
-                .clone();
+            // let ins: Arc<[ModuleIn]> = (*router)
+            //     .in_s
+            //     .get(id)
+            //     .expect("this Echo module was not found in the routing table struct.")
+            //     .0
+            //     .clone();
             let gen_sample: Box<dyn FnMut() -> Float + Send> =
                 Box::new(move || buff.lock().unwrap().get_sample(*audio_in.lock().unwrap()));
-            let outputs = vec![(outs, gen_sample)];
+            let outputs = (id, vec![(0, gen_sample)]);
 
             let add_audio: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
@@ -122,9 +135,9 @@ impl Module for Echo {
                 });
 
             let inputs = vec![
-                (&ins[DECAY_INPUT as usize], set_decay),
-                (&ins[AUDIO_INPUT as usize], add_audio),
-                (&ins[SPEED_INPUT as usize], speed_set),
+                (decay_cons, set_decay),
+                (audio_cons, add_audio),
+                (speed_cons, speed_set),
             ];
 
             // start the event loop
@@ -181,11 +194,53 @@ impl Module for Echo {
     //     Ok(())
     // }
 
-    fn n_outputs(&self) -> u8 {
-        N_OUTPUTS
+    // fn n_outputs(&self) -> u8 {
+    //     N_OUTPUTS
+    // }
+
+    // fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
+    //     self.outputs.clone()
+    // }
+
+    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.connect_auido_out_to(connection)?;
+        // // self.routing_table.inc_connect_counter(connection);
+        // info!("connecting: {connection:?}");
+        if connection.dest_input == AUDIO_INPUT {
+            self.audio_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == SPEED_INPUT {
+            self.speed_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == DECAY_INPUT {
+            self.decay_cons.lock().unwrap().push(connection);
+        } else {
+            bail!("invalid input selection");
+        }
+
+        Ok(())
     }
 
-    fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
-        self.outputs.clone()
+    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.disconnect_from(connection)?;
+        // info!("disconnecting: {connection:?}");
+        if connection.dest_input == AUDIO_INPUT {
+            self.audio_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == SPEED_INPUT {
+            self.speed_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == DECAY_INPUT {
+            self.decay_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else {
+            bail!("invalid input selection");
+        }
+
+        Ok(())
     }
 }

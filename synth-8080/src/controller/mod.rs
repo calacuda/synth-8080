@@ -1,18 +1,19 @@
 use crate::{
-    common::{event_loop, notes::Note, Connection, Module, ModuleInfo, ModuleType},
+    common::{admin_event_loop, notes::Note, Connection, Module, ModuleInfo, ModuleType},
     envelope,
-    router::{ModuleIn, Router, RoutingTable},
-    vco, Float,
+    output::Output,
+    router::{mk_module_ins, Inputs, ModuleIn, Router, RoutingTable},
+    spawn, vco, Float, JoinHandle,
 };
 use anyhow::{bail, ensure, Result};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use futures::future::join_all;
 use serialport::SerialPort;
 use std::{
     io,
     sync::{Arc, Mutex},
 };
-use tokio::{spawn, task::JoinHandle};
-use tracing::{error, info, warn};
+use tracing::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct OscilatorId {
@@ -57,11 +58,12 @@ pub struct Controller {
     /// a table representing all inputs of all modules
     pub routing_table: Router,
     /// a list of join handles for the event loops of all modules
-    pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    pub handles: Arc<Mutex<Vec<JoinHandle>>>,
     /// list of the locations of the oscilators and coresponding envelope filters
     pub oscilators: Arc<Mutex<Vec<OscilatorId>>>,
     /// UART connection to the micro-controller
     pub serial: Arc<Mutex<Box<dyn SerialPort>>>,
+    // pub output: Arc<Output>,
     // TODO: find lib to talk to MIDI device
     // /// Connection to MIDI device
     // pub midi: Arc<Mutex<>>,
@@ -72,16 +74,36 @@ impl Controller {
         let connections = Vec::new();
         let info = to_build.iter().map(|mod_type| mod_type.get_info());
 
-        let normal_name_space: Vec<Arc<[ModuleIn]>> =
-            info.clone().map(|mod_type| mod_type.0.io.into()).collect();
-        let admin_name_space: Vec<Arc<[ModuleIn]>> =
-            info.clone().map(|mod_type| mod_type.0.io.into()).collect();
-        let routing_table: Router = Arc::new((normal_name_space.into(), admin_name_space.into()));
-        info!("made routing table");
-        // make routing_table
+        let normal_name_space: Vec<(Arc<[ModuleIn]>, (Sender<()>, Receiver<()>))> = info
+            .clone()
+            .map(|mod_type| (mod_type.0.io.into(), unbounded::<()>()))
+            .collect();
+        let admin_name_space: Vec<(Arc<[ModuleIn]>, (Sender<()>, Receiver<()>))> = info
+            .clone()
+            .map(|mod_type| (mod_type.0.io.into(), unbounded::<()>()))
+            .collect();
 
-        let modules: Vec<(ModuleInfo, Box<dyn Module>)> = join_all(
-            to_build
+        let (global_sync_tx, global_sync_rx) = unbounded();
+
+        let routing_table: Router = Arc::new(Inputs {
+            in_s: normal_name_space.into(),
+            admin_in_s: admin_name_space.into(),
+            sync: global_sync_rx,
+        });
+        info!("made routing table");
+        // TODO: make output
+        let mut modules: Vec<(ModuleInfo, Box<dyn Module>)> = vec![(
+            ModuleInfo {
+                n_ins: 1,
+                n_outs: 0,
+                io: mk_module_ins(1),
+                mod_type: ModuleType::Output,
+            },
+            Box::new(Output::new(routing_table.clone(), global_sync_tx)),
+        )];
+
+        let mut mods: Vec<(ModuleInfo, Box<dyn Module>)> = join_all(
+            to_build[0..]
                 .iter()
                 // .zip(info)
                 .enumerate()
@@ -90,8 +112,16 @@ impl Controller {
         .await
         .into_iter()
         .zip(info)
-        .map(|(m, i)| (i.0, m))
+        .filter_map(|(m, i)| {
+            if let Some(m) = m {
+                Some((i.0, m))
+            } else {
+                None
+            }
+        })
         .collect();
+        modules.append(&mut mods);
+
         info!("made module list");
         // make modules
 
@@ -100,8 +130,9 @@ impl Controller {
             modules
                 .iter()
                 .map(|(_info, module)| module.start())
-                .collect::<anyhow::Result<Vec<JoinHandle<()>>>>()?,
+                .collect::<anyhow::Result<Vec<JoinHandle>>>()?,
         ));
+        // (*handles.lock().unwrap().deref_mut()).push(output.start()?);
         info!("started the modules");
 
         let serial = Arc::new(Mutex::new(serialport::new("/dev/ttyACM0", 115200).open()?));
@@ -118,7 +149,7 @@ impl Controller {
     }
 
     /// starts an event loop to listen for events over both serial and MIDI.
-    pub fn start(&self) -> JoinHandle<()> {
+    pub fn start(&self) -> JoinHandle {
         info!("starting controller event loop");
         // TODO: trun LED red
 
@@ -127,15 +158,13 @@ impl Controller {
         let router = self.routing_table.clone();
         let connections = self.connections.clone();
         let handles = self.handles.clone();
-        // handle serial events from micro controller
-        // sleep(Duration::from_secs(1)).await
         let osc_sample = Arc::new(Mutex::new(0.0));
         let env_sample = Arc::new(Mutex::new(0.0));
         let note = osc_sample.clone();
         let filter_open = env_sample.clone();
 
         let (osc_id, env_id) = osc.lock().unwrap()[0].get();
-        // info!("osc id => {osc_id}, env id => {env_id}");
+        info!("osc id => {osc_id}, env id => {env_id}");
 
         let gen_env_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
             let sample = *env_sample.lock().unwrap();
@@ -143,6 +172,8 @@ impl Controller {
 
             sample
         });
+
+        trace!("about to make envelope filter control thread");
         let jh = Controller::spawn_admin_cmd(
             gen_env_sample,
             env_id as u8,
@@ -159,6 +190,8 @@ impl Controller {
 
             sample
         });
+
+        trace!("about to make oscilator control thread");
         let jh = Controller::spawn_admin_cmd(
             gen_osc_sample,
             osc_id as u8,
@@ -169,6 +202,9 @@ impl Controller {
         handles.lock().unwrap().push(jh);
 
         let mut serial_buf: Vec<u8> = vec![0; 1000];
+
+        let mut jh_s = self.consume_admin_syncs(&[osc_id, env_id]);
+        handles.lock().unwrap().append(&mut jh_s);
 
         spawn(async move {
             loop {
@@ -201,6 +237,41 @@ impl Controller {
         })
     }
 
+    fn consume_admin_syncs(&self, module_black_list: &[usize]) -> Vec<JoinHandle> {
+        // let router = self.routing_table.clone();
+
+        // if let Err(e) = router.admin_in_s[outputs.0].1 .1.recv() {
+        //     error!("admin sync recv failed with error: {e}");
+        // }
+
+        self.routing_table
+            .admin_in_s
+            .iter()
+            .enumerate()
+            // .skip(1)
+            .filter_map(|(i, (_, (_tx, rx)))| {
+                let recv = rx.clone();
+
+                if !module_black_list.contains(&i) {
+                    Some(
+                        spawn(async move {
+                            trace!("starting consumer for admin module : {i}");
+
+                            loop {
+                                if let Err(e) = recv.recv() {
+                                    error!(
+                                        "module id: {i} failed to consume an admin sync signal. got error: {e}"
+                                    );
+                                };
+                            }
+                        })
+                    )
+                } else {
+                    None
+                }
+            }).collect()
+    }
+
     /// sends a samples to destnation module and input
     pub fn spawn_admin_cmd(
         gen_sample: Box<dyn FnMut() -> Float + Send>,
@@ -208,7 +279,7 @@ impl Controller {
         dest_input: u8,
         router: Router,
         connections: Arc<Mutex<Vec<Connection>>>,
-    ) -> JoinHandle<()> {
+    ) -> JoinHandle {
         let con = Connection {
             src_module: dest_module,
             src_output: dest_input,
@@ -219,20 +290,26 @@ impl Controller {
         };
 
         spawn(async move {
-            let ins: Arc<[ModuleIn]> = (*router)
-                .1
-                .get(dest_module as usize)
-                .expect("this VCO Module was not found in the routing table struct.")
-                .clone();
-            let outputs = vec![(Arc::new(Mutex::new(vec![con])), gen_sample)];
+            // let ins: Arc<[ModuleIn]> = (*router)
+            //     .in_s
+            //     .get(dest_module as usize)
+            //     .expect("this Controller Module was not found in the routing table struct.")
+            //     .0
+            //     .clone();
+            let outputs = (dest_module as usize, vec![(0, gen_sample)]);
 
-            let do_nothing: Box<dyn FnMut(Vec<Float>) + Send> =
-                Box::new(move |_samples: Vec<Float>| warn!("doing nothing"));
-            let inputs = vec![(&ins[dest_input as usize], do_nothing)];
+            // let do_nothing: Box<dyn FnMut(Vec<Float>) + Send> =
+            //     Box::new(move |_samples: Vec<Float>| warn!("doing nothing"));
+            // let inputs = vec![(&ins[dest_input as usize], do_nothing)];
 
             connections.lock().unwrap().push(con);
             router.inc_connect_counter(con);
-            event_loop(router.clone(), inputs, outputs).await;
+            admin_event_loop(
+                router.clone(),
+                // router.admin_in_s[dest_module as usize].1 .1,
+                outputs,
+            )
+            .await;
         })
     }
 
@@ -262,7 +339,7 @@ impl Controller {
             "the requested connection is already made"
         );
 
-        if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
+        if let Err(e) = self.modules.lock().unwrap()[dest_module as usize]
             .1
             .connect(con)
         {
@@ -300,7 +377,7 @@ impl Controller {
 
         // the counter must be decremented first to avoid the synth seezing up
         self.routing_table.dec_connect_counter(con);
-        if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
+        if let Err(e) = self.modules.lock().unwrap()[dest_module as usize]
             .1
             .disconnect(con)
         {
@@ -314,24 +391,25 @@ impl Controller {
 
     /// disconnects all connections
     pub fn disconnect_all(&self) {
+        self.routing_table.in_s.iter().for_each(|mod_ins| {
+            mod_ins.0.iter().for_each(|mod_in| {
+                let mut ac = mod_in.active_connections.lock().unwrap();
+                *ac = 0;
+            })
+        });
         self.connections.lock().unwrap().iter().for_each(|con| {
             self.modules.lock().unwrap().iter().for_each(|module| {
                 let _ = module.1.disconnect(con.clone());
             })
         });
         self.connections.lock().unwrap().clear();
-        self.routing_table.0.iter().for_each(|mod_ins| {
-            mod_ins.iter().for_each(|mod_in| {
-                let mut ac = mod_in.active_connections.lock().unwrap();
-                *ac = 0;
-            })
-        });
-        self.routing_table.1.iter().for_each(|mod_ins| {
-            mod_ins.iter().for_each(|mod_in| {
-                let mut ac = mod_in.active_connections.lock().unwrap();
-                *ac = 0;
-            })
-        });
+
+        // self.routing_table.1.iter().for_each(|mod_ins| {
+        //     mod_ins.iter().for_each(|mod_in| {
+        //         let mut ac = mod_in.active_connections.lock().unwrap();
+        //         *ac = 0;
+        //     })
+        // });
     }
 
     /// returns `true` if the connection can be made.

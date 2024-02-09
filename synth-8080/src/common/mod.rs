@@ -1,21 +1,19 @@
 use crate::{
     echo, envelope, lfo, output,
-    router::{
-        mk_module_ins, router_read_sample, router_read_sync, router_send_sample, router_send_sync,
-        ModuleIn, ModuleIns, Router,
-    },
-    vco, Float, FLOAT_LEN,
+    router::{mk_module_ins, ModuleIn, Router},
+    vco, Float, JoinHandle, FLOAT_LEN,
 };
 use anyhow::{ensure, Result};
+use log::trace;
 use std::{
-    fmt::Debug,
-    ops::{Deref, Index},
+    ops::Index,
     sync::{Arc, Mutex},
 };
-use tokio::task::JoinHandle;
-use tracing::{error, info};
+use tokio::time::{sleep, Duration};
+use tracing::*;
 
 pub mod notes;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModuleType {
     Vco,
@@ -26,16 +24,18 @@ pub enum ModuleType {
 }
 
 impl ModuleType {
-    pub async fn builder(&self, routing_table: Router, i: usize) -> Box<dyn Module> {
+    pub async fn builder(&self, routing_table: Router, i: usize) -> Option<Box<dyn Module>> {
         let id = i as u8;
         info!("making a {self:?} module");
 
-        let module: Box<dyn Module> = match *self {
-            ModuleType::Vco => Box::new(vco::Vco::new(routing_table, id)),
-            ModuleType::Output => Box::new(output::Output::new(routing_table, id)),
-            ModuleType::Lfo => Box::new(lfo::Lfo::new(routing_table, id)),
-            ModuleType::Echo => Box::new(echo::Echo::new(routing_table, id)),
-            ModuleType::EnvFilter => Box::new(envelope::EnvelopeFilter::new(routing_table, id)),
+        let module: Option<Box<dyn Module>> = match *self {
+            ModuleType::Vco => Some(Box::new(vco::Vco::new(routing_table, id))),
+            ModuleType::Output => None,
+            ModuleType::Lfo => Some(Box::new(lfo::Lfo::new(routing_table, id))),
+            ModuleType::Echo => Some(Box::new(echo::Echo::new(routing_table, id))),
+            ModuleType::EnvFilter => {
+                Some(Box::new(envelope::EnvelopeFilter::new(routing_table, id)))
+            }
         };
 
         info!("made a {self:?} module");
@@ -148,13 +148,12 @@ impl Index<Connection> for Router {
     type Output = ModuleIn;
 
     fn index(&self, index: Connection) -> &Self::Output {
-        let r = if index.dest_admin {
-            &self.deref().1
-        } else {
-            &self.deref().0
-        };
-
-        &r[index.dest_module as usize][index.dest_input as usize]
+        // if !index.src_admin {
+        //     &self.in_s[index.src_module as usize].0[index.src_output as usize]
+        // } else {
+        //     &self.admin_in_s[index.src_module as usize].0[index.src_output as usize]
+        // }
+        &self.in_s[index.src_module as usize].0[index.src_output as usize]
     }
 }
 
@@ -168,42 +167,44 @@ impl Index<Connection> for Router {
 
 pub trait Module {
     /// start the modules evvent loop
-    fn start(&self) -> anyhow::Result<JoinHandle<()>>;
+    fn start(&self) -> anyhow::Result<JoinHandle>;
     /// connects the module to another module
-    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
-        ensure!(
-            connection.src_output < self.n_outputs(),
-            "invalid output selection"
-        );
-        ensure!(
-            !self.connections().lock().unwrap().contains(&connection),
-            "module already connected"
-        );
-        self.connections().lock().unwrap().push(connection);
-
-        Ok(())
-    }
-    /// returns how many outputs the module has
-    fn n_outputs(&self) -> u8;
-    /// returns the Arc<Mutex<Vec<Connection>>> that stores the currently connected connections
-    fn connections(&self) -> Arc<Mutex<Vec<Connection>>>;
+    // fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+    //     ensure!(
+    //         connection.src_output < self.n_outputs(),
+    //         "invalid output selection"
+    //     );
+    //     ensure!(
+    //         !self.connections().lock().unwrap().contains(&connection),
+    //         "module already connected"
+    //     );
+    //     self.connections().lock().unwrap().push(connection);
+    //
+    //     Ok(())
+    // }
+    // /// returns how many outputs the module has
+    // fn n_outputs(&self) -> u8;
+    // /// returns the Arc<Mutex<Vec<Connection>>> that stores the currently connected connections
+    // fn connections(&self) -> Arc<Mutex<Vec<Connection>>>;
     /// disconnects the module from another module
-    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
-        ensure!(
-            connection.src_output < self.n_outputs(),
-            "invalid output selection"
-        );
-        ensure!(
-            self.connections().lock().unwrap().contains(&connection),
-            "module not connected"
-        );
-        self.connections()
-            .lock()
-            .unwrap()
-            .retain(|out| *out != connection);
-
-        Ok(())
-    }
+    // fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+    //     ensure!(
+    //         connection.src_output < self.n_outputs(),
+    //         "invalid output selection"
+    //     );
+    //     ensure!(
+    //         self.connections().lock().unwrap().contains(&connection),
+    //         "module not connected"
+    //     );
+    //     self.connections()
+    //         .lock()
+    //         .unwrap()
+    //         .retain(|out| *out != connection);
+    //
+    //     Ok(())
+    // }
+    fn connect(&self, connection: Connection) -> anyhow::Result<()>;
+    fn disconnect(&self, connection: Connection) -> anyhow::Result<()>;
 }
 
 pub fn mk_float(b: &[u8]) -> Result<Float> {
@@ -218,74 +219,207 @@ pub fn bend_range() -> Float {
     (2.0 as Float).powf(2.0 / 12.0)
 }
 
-pub fn sync_with_inputs(ins: &mut Vec<(&ModuleIn, Box<dyn FnMut(Vec<Float>) + Send>)>) {
-    ins.iter_mut().for_each(|(cons, f)| {
-        let n_cons = *cons.active_connections.lock().unwrap();
-        // info!("{n_cons} active connections");
-
-        if n_cons > 0 {
+pub async fn sync_with_inputs(
+    // id: usize,
+    router: &Router,
+    ins: &mut Vec<(
+        Arc<Mutex<Vec<Connection>>>,
+        Box<dyn FnMut(Vec<Float>) + Send>,
+    )>,
+) {
+    ins.iter_mut()
+        .enumerate()
+        .for_each(|(_i, (connections, f))| {
+            // let n_cons = *mods.active_connections.lock().unwrap();
+            // // info!("{n_cons} active connections");
+            //
+            // if n_cons > 0 {
             // info!("syncing with input");
-            (0..n_cons).for_each(|_| router_send_sync(&cons.input));
-            // router_send_sync(&cons.input);
-            // info!("synced with inputs");
-
-            // let samples: Vec<Float> = (0..n_cons)
-            //     .map(|_i| {
-            //         // send sync signal
-            //         router_send_sync(&cons.input);
-            //         // info!("reading sample");
-            //         // read sample from connection
-            //         router_read_sample(&cons.input)
+            // let samples = (0..n_cons)
+            //     .map(|_| {
+            //         // router_send_sync(&cons));
+            //                             // info!("foo");
             //     })
             //     .collect();
-            let samples = router_read_sample(&cons.input);
+            // warn!("n connections: {}", connections.lock().unwrap().len());
 
-            // if sample.len() > 0 {
-            f(samples);
+            // trace!("syncing with input : {i}");
+            let samples: Vec<Float> = connections
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|con| router[*con].sample.lock().unwrap().clone())
+                .collect();
+            // trace!("syncd with input : {i}");
+
+            // warn!("samples: {:?}", samples);
+            if !samples.is_empty() {
+                f(samples);
+            }
+            // info!("read samples from inputs");
             // }
-        }
-    })
+        });
 }
 
-pub fn send_samples(
-    router: Router,
-    outs: &mut [(
-        Arc<Mutex<Vec<Connection>>>,
-        Box<dyn FnMut() -> Float + Send>,
-    )],
+pub async fn send_samples(
+    router: &Router,
+    id: usize,
+    outs: &mut [(usize, Box<dyn FnMut() -> Float + Send>)],
 ) {
-    outs.iter_mut().for_each(|(cons, f)| {
+    outs.iter_mut().for_each(|(out, f)| {
         let sample = f();
         // info!("sample {sample}");
 
-        cons.lock().unwrap().iter().for_each(|con| {
-            // info!("about to read sync");
+        // cons.lock().unwrap().iter().for_each(|con| {
+        // info!("about to read sync");
 
-            if let Err(e) = router_read_sync(router.clone(), *con) {
-                error!("encountered an error waiting for sync message: {e}");
-            }
+        // if let Err(e) = router_read_sync(router.clone(), *con) {
+        //     error!("encountered an error waiting for sync message: {e}");
+        // }
 
-            if let Err(e) = router_send_sample(router.clone(), *con, sample) {
-                error!("encountered an error sending sample: {e}");
-            };
-        });
-    })
+        // debug!("sending samples from {id}:{out}");
+
+        // if con.src_admin {
+        //     info!("sending from the controller {sample}");
+        // }
+        let mut bucket = router.in_s[id].0[*out].sample.lock().unwrap();
+        *bucket = sample;
+        // if let Err(e) = router_send_sample(router.clone(), *con, sample) {
+        //     error!("encountered an error sending sample: {e}");
+        // };
+        // });
+    });
+
+    trace!("exiting send_samples");
 }
 
 pub async fn event_loop<'a>(
     router: Router,
-    mut inputs: Vec<(&'a ModuleIn, Box<dyn FnMut(Vec<Float>) + Send>)>,
-    mut outputs: Vec<(
+    // sync: Receiver<()>,
+    mut inputs: Vec<(
         Arc<Mutex<Vec<Connection>>>,
-        Box<dyn FnMut() -> Float + Send>,
+        Box<dyn FnMut(Vec<Float>) + Send>,
     )>,
+    mut outputs: (usize, Vec<(usize, Box<dyn FnMut() -> Float + Send>)>),
 ) {
     info!("starting event loop");
 
+    if let Err(e) = router.sync.recv() {
+        error!("failed to wait for sync from output module, {e}");
+    }
+
+    let id = outputs.0;
+
+    trace!("entering indefinate loop inside the event_loop fucntion for module {id}");
+
     loop {
         // TODO: check graceful shutdown channel and quit if should.
-        sync_with_inputs(&mut inputs);
-        send_samples(router.clone(), &mut outputs);
+        // info!("will attempt to sync with inputs");
+
+        // if let Err(e) = router.sync.recv() {
+        //     error!("failed to wait for sync from output module, {e}");
+        // }
+
+        // if let Err(e) = router.in_s[outputs.0].1 .1.recv() {
+        //     error!(
+        //         "sync recv failed for module: {}. sync failed with error: {e}",
+        //         outputs.0
+        //     );
+        // }
+
+        // sync_with_inputs(&router, &mut inputs).await;
+        // // trace!("synced with inputs");
+        // send_samples(&router, outputs.0, &mut outputs.1).await;
+        // // trace!("samples sent");
+
+        // sync with inputs
+        inputs
+            .iter_mut()
+            .enumerate()
+            .for_each(|(_i, (connections, f))| {
+                // trace!("syncing with input : {i}");
+                let samples: Vec<Float> = connections
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|con| router[*con].sample.lock().unwrap().clone())
+                    .collect();
+                // trace!("syncd with input : {i}");
+
+                // debug!("samples: {:?}", samples);
+                if !samples.is_empty() {
+                    f(samples);
+                }
+            });
+
+        // gererate samples for output
+
+        // let mut output_samples =
+        outputs.1.iter_mut().for_each(|(out, f)| {
+            // let sample = f();
+            let mut bucket = router.in_s[id].0[*out].sample.lock().unwrap();
+            // (bucket, f())
+            // debug!("sending samples from {id}:{out}");
+            *bucket = f();
+
+            // let mut bucket = router.in_s[id].0[*out].sample.lock().unwrap();
+            // *bucket = sample;
+        });
+
+        if let Err(e) = router.in_s[outputs.0].1 .1.recv() {
+            error!(
+                "sync recv failed for module: {}. sync failed with error: {e}",
+                outputs.0
+            );
+        }
+
+        // upload samples
+        // output_samples.for_each(|(mut bucket, sample)| {
+        //     // debug!("sending samples from {id}:{out}");
+        //
+        //     // let mut bucket = router.in_s[id].0[*out].sample.lock().unwrap();
+        //     *bucket = sample;
+        // });
+
+        // sleep(Duration::from_nanos(1)).await;
+    }
+}
+
+pub async fn admin_event_loop<'a>(
+    router: Router,
+    // sync: Receiver<()>,
+    // mut inputs: Vec<(&'a ModuleIn, Box<dyn FnMut(Vec<Float>) + Send>)>,
+    mut outputs: (usize, Vec<(usize, Box<dyn FnMut() -> Float + Send>)>),
+) {
+    if let Err(e) = router.sync.recv() {
+        error!("[admin] failed to wait for sync from output module, {e}");
+    }
+
+    loop {
+        // TODO: check graceful shutdown channel and quit if should.
+        // if let Err(e) = sync.recv() {
+        //     error!("failed to wait for sync from output module, {e}");
+        // }
+
+        // info!("[admin] id => {}", outputs.0);
+
+        outputs.1.iter_mut().for_each(|(out, f)| {
+            // let sample = f();
+            let mut bucket = router.admin_in_s[outputs.0].0[*out].sample.lock().unwrap();
+            *bucket = f();
+        });
+
+        if let Err(e) = router.admin_in_s[outputs.0].1 .1.recv() {
+            error!(
+                "[admin] sync recv failed for admin module: {}. sync failed with error: {e}",
+                outputs.0
+            );
+        }
+
+        // send_samples(router.clone(), outputs.0, &mut outputs.1);
+
+        // info!("will attempt to sync with inputs");
+        // sync_with_inputs(&mut inputs);
         // sleep(Duration::from_nanos(1)).await;
     }
 }

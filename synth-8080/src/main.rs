@@ -2,7 +2,12 @@
 use anyhow::{bail, Result};
 use common::ModuleType;
 use std::mem;
-use tracing::{error, info, warn};
+use tracing::{error, info, warn, Level};
+
+pub use tokio::task::spawn;
+pub type JoinHandle = tokio::task::JoinHandle<()>;
+// pub use std::thread::spawn;
+// pub type JoinHandle = std::thread::JoinHandle<()>;
 
 // pub mod adbdr;
 // pub mod adsr;
@@ -34,6 +39,8 @@ async fn main() -> Result<()> {
         .compact()
         .with_thread_ids(true)
         .with_target(true)
+        .with_level(true)
+        .with_max_level(Level::TRACE)
         .without_time()
         .finish();
     // use that subscriber to process traces emitted after this point
@@ -53,10 +60,10 @@ async fn main() -> Result<()> {
         ModuleType::EnvFilter,
         ModuleType::Lfo,
         ModuleType::Echo,
-        // ModuleType::Echo,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::EnvFilter,
+        ModuleType::Echo,
+        ModuleType::Vco,
+        ModuleType::EnvFilter,
+        ModuleType::EnvFilter,
     ];
 
     let ctrlr = controller::Controller::new(&modules).await.map_or_else(
@@ -84,11 +91,15 @@ async fn main() -> Result<()> {
     // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
 
     // connect vco to output directly
-    // ctrlr.connect(1, 0, 0, 0)?;
+    ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
-    ctrlr.connect(1, 0, 2, envelope::AUDIO_IN)?;
+    // if let Err(e) = ctrlr.connect(1, 0, 2, envelope::AUDIO_IN) {
+    //     error!("{e}");
+    // };
     // connect adbdr to output
-    ctrlr.connect(2, 0, 0, 0)?;
+    // if let Err(e) = ctrlr.connect(2, 0, 0, 0) {
+    //     error!("{e}");
+    // }
     // connect adbdr to echo
     // ctrlr.connect(3, 0, 4, echo::AUDIO_INPUT)?;
     // connect echo to output

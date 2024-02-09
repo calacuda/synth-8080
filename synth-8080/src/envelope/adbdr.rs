@@ -134,13 +134,14 @@ impl Envelope for Filter {
 
     fn open_filter(&mut self, samples: Vec<Float>) {
         let sample: Float = samples.iter().sum::<Float>().tanh();
+        // info!("envelope filter is open: {}", sample >= 0.75);
 
         if self.pressed && sample <= 0.75 {
-            // info!("release");
+            info!("release");
             self.phase = Phase::Release;
             self.pressed = false;
         } else if !self.pressed && self.phase == Phase::Neutural && sample >= 0.75 {
-            // info!("pressed");
+            info!("pressed");
             self.phase = Phase::Attack;
             self.pressed = true;
         }

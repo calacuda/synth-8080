@@ -1,15 +1,14 @@
 use crate::{
     common::{event_loop, Connection, Module},
     osc::{OscType, Oscilator},
-    router::{ModuleIn, Router},
-    Float,
+    router::Router,
+    spawn, Float, JoinHandle,
 };
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use std::{
     ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
 };
-use tokio::task::{spawn, JoinHandle};
 use tracing::info;
 
 pub const N_INPUTS: u8 = 3;
@@ -31,6 +30,9 @@ pub struct Lfo {
     /// the note to be played
     pub pitch_in: Arc<Mutex<Float>>,
     pub id: u8,
+    pub volume_in_cons: Arc<Mutex<Vec<Connection>>>,
+    pub pitch_in_cons: Arc<Mutex<Vec<Connection>>>,
+    pub osc_type_in_cons: Arc<Mutex<Vec<Connection>>>,
 }
 
 impl Lfo {
@@ -40,6 +42,9 @@ impl Lfo {
         let outputs = Arc::new(Mutex::new(Vec::new()));
         let volume_in = Arc::new(Mutex::new(1.0));
         let pitch_in = Arc::new(Mutex::new(5.0));
+        let volume_in_cons = Arc::new(Mutex::new(Vec::new()));
+        let pitch_in_cons = Arc::new(Mutex::new(Vec::new()));
+        let osc_type_in_cons = Arc::new(Mutex::new(Vec::new()));
 
         // DEBUG
         osc.lock().unwrap().set_frequency(2.5);
@@ -53,6 +58,9 @@ impl Lfo {
             volume_in,
             pitch_in,
             id,
+            volume_in_cons,
+            pitch_in_cons,
+            osc_type_in_cons,
         }
     }
 
@@ -133,23 +141,26 @@ impl Lfo {
     }
 
     /// starts a thread to generate samples.
-    pub fn start_event_loop(&self) -> JoinHandle<()> {
+    pub fn start_event_loop(&self) -> JoinHandle {
         // let empty_vec = Vec::new();
         let osc = self.osc.clone();
-        let audio_outs = self.outputs.clone();
+        // let audio_outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let volume = self.volume_in.clone();
         let volume_2 = self.volume_in.clone();
         let pitch = self.pitch_in.clone();
         let id = self.id as usize;
 
+        let vol_cons = self.volume_in_cons.clone();
+        let pitch_cons = self.pitch_in_cons.clone();
+
         spawn(async move {
             // prepare call back for event loop
-            let ins: Arc<[ModuleIn]> = (*router)
-                .0
-                .get(id)
-                .expect("this LFO Module was not found in the routing table struct.")
-                .clone();
+            // let ins: Arc<[ModuleIn]> = (*router)
+            //     .in_s
+            //     .get(id)
+            //     .expect("this LFO Module was not found in the routing table struct.")
+            //     .clone();
             let gen_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
                 let sample = osc.lock().unwrap().get_sample() * volume_2.lock().unwrap().deref();
                 // info!("lfo output volume {}", sample);
@@ -160,7 +171,7 @@ impl Lfo {
                     let mut v = volume.lock().unwrap();
                     *v = samples.iter().sum::<Float>() / (samples.len() as Float);
                 });
-            let outputs = vec![(audio_outs, gen_sample)];
+            let outputs = (id, vec![(0, gen_sample)]);
             let update_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     let mut p = pitch.lock().unwrap();
@@ -168,8 +179,9 @@ impl Lfo {
                 });
 
             let inputs = vec![
-                (&ins[VOL_IN as usize], update_volume),
-                (&ins[PITCH_IN as usize], update_pitch),
+                (vol_cons, update_volume),
+                (pitch_cons, update_pitch),
+                // TODO: oscilator selction
             ];
 
             // start the event loop
@@ -179,30 +191,57 @@ impl Lfo {
 }
 
 impl Module for Lfo {
-    fn start(&self) -> anyhow::Result<JoinHandle<()>> {
+    fn start(&self) -> anyhow::Result<JoinHandle> {
         Ok(self.start_event_loop())
     }
 
-    // fn connect(&self, connection: Connection) -> anyhow::Result<()> {
-    //     self.connect_auido_out_to(connection)?;
-    //     // self.routing_table.inc_connect_counter(connection);
-    //     info!("connecting: {connection:?}");
-    //
-    //     Ok(())
-    // }
-    //
-    // fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
-    //     self.disconnect_from(connection)?;
-    //     info!("disconnecting: {connection:?}");
-    //
-    //     Ok(())
-    // }
+    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.connect_auido_out_to(connection)?;
+        // // self.routing_table.inc_connect_counter(connection);
+        // info!("connecting: {connection:?}");
+        if connection.dest_input == PITCH_IN {
+            self.pitch_in_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == PITCH_IN {
+            self.pitch_in_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == PITCH_IN {
+            self.pitch_in_cons.lock().unwrap().push(connection);
+        } else {
+            bail!("invalid input selection");
+        }
 
-    fn n_outputs(&self) -> u8 {
-        N_OUTPUTS
+        Ok(())
     }
 
-    fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
-        self.outputs.clone()
+    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.disconnect_from(connection)?;
+        // info!("disconnecting: {connection:?}");
+        if connection.dest_input == PITCH_IN {
+            self.pitch_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == PITCH_IN {
+            self.pitch_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == PITCH_IN {
+            self.pitch_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else {
+            bail!("invalid input selection");
+        }
+
+        Ok(())
     }
+
+    // fn n_outputs(&self) -> u8 {
+    //     N_OUTPUTS
+    // }
+    //
+    // fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
+    //     self.outputs.clone()
+    // }
 }

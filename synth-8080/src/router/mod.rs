@@ -1,22 +1,26 @@
 use crate::{common::Connection, Float};
-use anyhow::bail;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use std::{
-    ops::{Deref, DerefMut},
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-use tracing::{error, info};
+use std::sync::{Arc, Mutex};
+use tracing::{info, trace, warn};
 
 pub type NConnections = u8;
-pub type ModuleIns = Arc<[ModuleIn]>;
+// one sync per module
+pub type ModuleIns = (Arc<[ModuleIn]>, (Sender<()>, Receiver<()>));
 pub type AllInputs = Arc<[ModuleIns]>;
 
 // pub type AdminModuleIns = Arc<&[AdminModuleIn]>;
 // pub type AllAdminInputs = Arc<&[AdminModuleIns]>;
 
 // pub type Router = Arc<(AllInputs, AllAdminInputs)>;
-pub type Router = Arc<(AllInputs, AllInputs)>;
+// pub type Router = Arc<(AllInputs, AllInputs)>;
+pub type Router = Arc<Inputs>;
+
+#[derive(Clone, Debug)]
+pub struct Inputs {
+    pub in_s: AllInputs,
+    pub admin_in_s: AllInputs,
+    pub sync: Receiver<()>,
+}
 
 pub trait RoutingTable {
     /// used to make the connection described by the `connection` param.
@@ -28,12 +32,12 @@ pub trait RoutingTable {
 impl RoutingTable for Router {
     fn inc_connect_counter(&self, connection: Connection) {
         // increment active_connection counter
-        *self[connection]
-            .active_connections
-            .lock()
-            .unwrap()
-            .deref_mut() += 1;
-        // info!("incremented the active connection counter for connection: {connection:?}");
+        let mut counter = self[connection].active_connections.lock().unwrap();
+        *counter += 1;
+        info!(
+            "incremented the active connection counter ({counter}) for connection: {}:{}, is admin: {}",
+            connection.dest_module, connection.dest_input, connection.src_admin
+        );
     }
 
     fn dec_connect_counter(&self, connection: Connection) {
@@ -59,26 +63,17 @@ pub struct ModuleInTX {
 #[derive(Debug, Clone)]
 pub struct ModuleIn {
     pub active_connections: Arc<Mutex<NConnections>>,
-    pub input: ModuleInRX,
-    pub output: ModuleInTX,
+    pub sample: Arc<Mutex<Float>>,
 }
 
 impl ModuleIn {
     pub fn new() -> Self {
         // change to bounded(0) if there are messaging problems or latency/syncronization issues
-        let (i_tx_i, i_rx_i): (Sender<Float>, Receiver<Float>) = unbounded();
-        let (i_tx_o, i_rx_o): (Sender<()>, Receiver<()>) = unbounded();
+        // let (tx, rx): (Sender<Float>, Receiver<Float>) = unbounded();
 
         ModuleIn {
             active_connections: Arc::new(Mutex::new(0)),
-            input: ModuleInRX {
-                recv: i_rx_i,
-                send: i_tx_o,
-            },
-            output: ModuleInTX {
-                recv: i_rx_o,
-                send: i_tx_i,
-            },
+            sample: Arc::new(Mutex::new(0.0)),
         }
     }
 }
@@ -150,12 +145,14 @@ pub fn router_send_sample(router: Router, con: Connection, value: Float) -> anyh
     //     );
     // }
 
-    router[con].output.send.send(value)?;
+    // router[con].send.send(value)?;
+    let mut sample = router[con].sample.lock().unwrap();
+    *sample = value;
 
     Ok(())
 }
 
-pub fn router_read_sample(input: &ModuleInRX) -> Vec<Float> {
+pub fn router_read_sample(input: &ModuleIn) -> Float {
     // loop {
     // // TODO: consider making this recv ALL samples in the channel (might not be nesseary tho)
 
@@ -168,16 +165,20 @@ pub fn router_read_sample(input: &ModuleInRX) -> Vec<Float> {
     //     }
     // }
     // // } // .unwrap_or(0.0)
-    input.recv.recv().into_iter().collect()
+    // input.recv.recv().into_iter().collect()
+    trace!("router_read_sample");
+    input.sample.lock().unwrap().clone()
+    // let n_cons = *input.active_connections.lock().unwrap();
+    // (0..n_cons).map(|_| input.recv.recv()).collect()
 }
 
-pub fn router_send_sync(input: &ModuleInRX) {
-    // info!("sending sync");
-
-    while let Err(e) = input.send.send(()) {
-        error!("coulnd not send sync signal. failed with error {e}");
-    }
-}
+// pub fn router_send_sync(input: &ModuleInRX) {
+//     // info!("sending sync");
+//
+//     while let Err(e) = input.send.send(()) {
+//         error!("coulnd not send sync signal. failed with error {e}");
+//     }
+// }
 
 pub fn router_read_sync(router: Router, con: Connection) -> anyhow::Result<()> {
     // let n_cons = {
@@ -221,7 +222,7 @@ pub fn router_read_sync(router: Router, con: Connection) -> anyhow::Result<()> {
     //         //     return Ok(());
     //     }
     // }
-    router[con].output.recv.recv()?;
+    router.sync.recv()?;
 
     Ok(())
 

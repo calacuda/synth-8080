@@ -1,16 +1,16 @@
 use crate::{
     common::{bend_range, event_loop, notes::Note, Connection, Module},
     osc::{OscType, Oscilator},
-    router::{ModuleIn, Router},
-    Float,
+    router::Router,
+    spawn, Float, JoinHandle,
 };
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use std::{
     ops::Deref,
     sync::{Arc, Mutex},
 };
-use tokio::task::{spawn, JoinHandle};
-use tracing::info;
+// use tokio::task::{spawn, JoinHandle};
+use tracing::*;
 
 pub const N_INPUTS: u8 = 3;
 pub const N_OUTPUTS: u8 = 1;
@@ -29,14 +29,20 @@ pub struct Vco {
     pub outputs: Arc<Mutex<Vec<Connection>>>,
     /// where the data from the volume input is stored
     pub volume_in: Arc<Mutex<Float>>,
+    /// where the connections for the volume input is stored
+    pub volume_in_cons: Arc<Mutex<Vec<Connection>>>,
     /// where the data from the pitch bend input is stored
     pub pitch_bend_in: Arc<Mutex<Float>>,
+    /// where the connections for the pitch bend input is stored
+    pub pitch_bend_in_cons: Arc<Mutex<Vec<Connection>>>,
     /// the note to be played
     pub pitch_in: Arc<Mutex<Float>>,
+    /// the connection, controlling what note to play
+    pub pitch_in_cons: Arc<Mutex<Vec<Connection>>>,
     /// wether the oscilator should produce over tones.
     pub overtones: Arc<Mutex<bool>>,
     /// the thread handle that computes generates the next sample
-    pub generator: Arc<Mutex<JoinHandle<()>>>,
+    pub generator: Arc<Mutex<JoinHandle>>,
     /// the note the oscilator is suposed to make, used to reset self.osc if pitch_bend_in
     /// disconnects
     pub note: Arc<Mutex<Note>>,
@@ -59,9 +65,12 @@ impl Vco {
         let generator = Arc::new(Mutex::new(spawn(async {})));
         let note = Arc::new(Mutex::new(Note::A4));
         let bend_amt = Arc::new(bend_range());
+        let volume_in_cons = Arc::new(Mutex::new(Vec::new()));
+        let pitch_in_cons = Arc::new(Mutex::new(Vec::new()));
+        let pitch_bend_in_cons = Arc::new(Mutex::new(Vec::new()));
 
         // DEBUG
-        // osc.lock().unwrap().set_frequency(Note::A4.into());
+        osc.lock().unwrap().set_frequency(Note::A4.into());
         // osc.lock().unwrap().set_overtones(true);
         // osc.lock().unwrap().set_waveform(OscType::Triangle);
 
@@ -78,6 +87,9 @@ impl Vco {
             note,
             bend_amt,
             id,
+            volume_in_cons,
+            pitch_bend_in_cons,
+            pitch_in_cons,
         }
     }
 
@@ -108,13 +120,6 @@ impl Vco {
             .lock()
             .unwrap()
             .retain(|out| *out != connection);
-        // info!(
-        //     "connected output: {}, of module: {}, to input: {}, of module: {}",
-        //     connection.src_output,
-        //     connection.src_module,
-        //     connection.dest_input,
-        //     connection.dest_module
-        // );
 
         Ok(())
     }
@@ -137,9 +142,9 @@ impl Vco {
     }
 
     /// starts a thread to generate samples.
-    pub fn start_event_loop(&self) -> JoinHandle<()> {
+    pub fn start_event_loop(&self) -> JoinHandle {
         let osc = self.osc.clone();
-        let outs = self.outputs.clone();
+        // let outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let volume = self.volume_in.clone();
         let volume_2 = self.volume_in.clone();
@@ -148,19 +153,24 @@ impl Vco {
         let osc_2 = self.osc.clone();
         let osc_3 = self.osc.clone();
 
+        let vol_in_cons = self.volume_in_cons.clone();
+        let pitch_cons = self.pitch_in_cons.clone();
+        let pitch_bend_cons = self.pitch_bend_in_cons.clone();
+
         spawn(async move {
             // prepare call back for event loop
-            let ins: Arc<[ModuleIn]> = (*router)
-                .0
-                .get(id)
-                .expect("this VCO Module was not found in the routing table struct.")
-                .clone();
+            // let ins: Arc<[ModuleIn]> = (*router)
+            //     .in_s
+            //     .get(id)
+            //     .expect("this VCO Module was not found in the routing table struct.")
+            //     .clone();
             let gen_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
                 let sample = osc.lock().unwrap().get_sample();
                 // info!("volume is {}", volume_2.lock().unwrap());
+                // info!("sample is {sample}");
                 sample * volume_2.lock().unwrap().deref()
             });
-            let outputs = vec![(outs, gen_sample)];
+            let outputs = (id, vec![(0, gen_sample)]);
             let update_volume: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     let mut v = volume.lock().unwrap();
@@ -174,7 +184,7 @@ impl Vco {
                     *p = samples[samples.len() - 1];
                     let mut osc = osc_3.lock().unwrap();
                     (*osc).set_frequency(*p);
-                    // info!("setting pitch to {p}");
+                    info!("setting pitch to {p}");
                 });
             let bend_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
@@ -183,9 +193,9 @@ impl Vco {
                     osc_2.lock().unwrap().apply_bend(bend);
                 });
             let inputs = vec![
-                (&ins[VOLUME_INPUT as usize], update_volume),
-                (&ins[PITCH_INPUT as usize], set_pitch),
-                (&ins[PITCH_BEND_INPUT as usize], bend_pitch),
+                (vol_in_cons, update_volume),
+                (pitch_cons, set_pitch),
+                (pitch_bend_cons, bend_pitch),
             ];
 
             // start the event loop
@@ -204,30 +214,57 @@ impl Vco {
 }
 
 impl Module for Vco {
-    fn start(&self) -> anyhow::Result<JoinHandle<()>> {
+    fn start(&self) -> anyhow::Result<JoinHandle> {
         Ok(self.start_event_loop())
     }
 
-    // fn connect(&self, connection: Connection) -> anyhow::Result<()> {
-    //     self.connect_auido_out_to(connection)?;
-    //     // self.routing_table.inc_connect_counter(connection);
-    //     // info!("connecting: {connection:?}");
-    //
-    //     Ok(())
-    // }
-    //
-    // fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
-    //     self.disconnect_from(connection)?;
-    //     // info!("disconnecting: {connection:?}");
-    //
-    //     Ok(())
-    // }
+    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.connect_auido_out_to(connection)?;
+        // self.routing_table.inc_connect_counter(connection);
+        // info!("connecting: {connection:?}");
+        if connection.dest_input == VOLUME_INPUT {
+            self.volume_in_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == PITCH_INPUT {
+            self.pitch_in_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == PITCH_BEND_INPUT {
+            self.pitch_bend_in_cons.lock().unwrap().push(connection);
+        } else {
+            bail!("invalid input selection");
+        }
 
-    fn n_outputs(&self) -> u8 {
-        N_OUTPUTS
+        Ok(())
     }
 
-    fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
-        self.outputs.clone()
+    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.disconnect_from(connection)?;
+        // info!("disconnecting: {connection:?}");
+        if connection.dest_input == VOLUME_INPUT {
+            self.volume_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| con != &connection);
+        } else if connection.dest_input == PITCH_INPUT {
+            self.pitch_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| con != &connection);
+        } else if connection.dest_input == PITCH_BEND_INPUT {
+            self.pitch_bend_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| con != &connection);
+        } else {
+            bail!("invalid input selection");
+        }
+
+        Ok(())
     }
+
+    // fn n_outputs(&self) -> u8 {
+    //     N_OUTPUTS
+    // }
+    //
+    // fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
+    //     self.outputs.clone()
+    // }
 }

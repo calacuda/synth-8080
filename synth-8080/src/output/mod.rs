@@ -1,17 +1,17 @@
 use crate::{
     common::{Connection, Module},
-    router::{router_read_sample, router_send_sync, Router},
-    Float,
+    router::Router,
+    spawn, Float, JoinHandle,
 };
+use anyhow::bail;
+use crossbeam_channel::Sender;
 use rodio::{OutputStream, Source};
 use std::{
-    ops::Deref,
     sync::{Arc, Mutex},
     thread::sleep,
     time::Duration,
 };
-use tokio::spawn;
-use tracing::info;
+use tracing::*;
 
 // TODO: Add a volume input to output
 pub const N_INPUTS: u8 = 1;
@@ -20,12 +20,30 @@ pub const N_OUTPUTS: u8 = 0;
 #[derive(Clone)]
 pub struct Audio {
     router: Router,
-    id: usize,
+    pub inputs: Arc<Mutex<Vec<Connection>>>,
 }
 
 impl Audio {
-    pub fn new(router: Router, id: usize) -> Self {
-        Self { router, id }
+    pub fn new(router: Router, sync: Sender<()>) -> Self {
+        let inputs = Arc::new(Mutex::new(Vec::new()));
+        let size = router.in_s.len() - 1;
+        // (*router.in_s)
+        //     .iter()
+        //     .flat_map(|a| a.iter())
+        //     .collect::<Vec<_>>()
+        //     .len();
+
+        (0..size * 2).for_each(|_i| {
+            // warn!("initial first i: {i}");
+
+            if let Err(e) = sync.send(()) {
+                error!("failed sending sync: {e}");
+            }
+            // warn!("initial first i: {i}");
+        });
+        // warn!("router len: {}", router.in_s.len());
+
+        Self { router, inputs }
     }
 }
 
@@ -33,23 +51,94 @@ impl Iterator for Audio {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let input = &self.router.deref().0[self.id][0].input;
-        let ins = &self.router.deref().0[self.id][0];
-        // router_send_sync(input);
-        // // info!("sync sent");
-        // let sample = router_read_sample(input);
-        // // info!("sample => {sample}");
-        let n_cons = ins.active_connections.lock().unwrap();
-        // let sample: Float = (0..(*n_cons) as usize)
-        //     .map(|_i| {
-        //         router_send_sync(&input);
-        //         // info!("reading sample");
-        //         // read sample from connection
-        //         router_read_sample(&input)
-        //     })
-        //     .sum();
-        (0..(*n_cons) as usize).for_each(|_| router_send_sync(&input));
-        let sample: Float = router_read_sample(&input).iter().sum();
+        // let input = &self.router.deref().0[self.id][0].input;
+        // let ins = &self.router.deref().0[self.id][0];
+        // // router_send_sync(input);
+        // // // info!("sync sent");
+        // // let sample = router_read_sample(input);
+        // // // info!("sample => {sample}");
+        // let n_cons = ins.active_connections.lock().unwrap();
+        // // let sample: Float = (0..(*n_cons) as usize)
+        // //     .map(|_i| {
+        // //         router_send_sync(&input);
+        // //         // info!("reading sample");
+        // //         // read sample from connection
+        // //         router_read_sample(&input)
+        // //     })
+        // //     .sum();
+        // (0..(*n_cons) as usize).for_each(|_| router_send_sync(&input));
+        // let sample: Float = router_read_sample(&input).iter().sum();
+        // info!("sample => {sample}");
+
+        // info!(
+        //     "sending sync from output module, sending {} sync signals",
+        //     self.size
+        // );
+        // (0..self.size).for_each(|_i| {
+        //     // warn!("first i: {i}");
+        //     if let Err(e) = self.sync.send(()) {
+        //         error!("failed sending sync: {e}");
+        //     }
+        //
+        //     // warn!("second i: {i}");
+        // });
+        // info!("output module synced succesfully");
+        // let sample: Float = samples.sum();
+
+        // let ins = &self.router.deref().in_s[0][0];
+        // info!("reading samples");
+        // info!(
+        //     "recv-ing {} samples",
+        //     ins.active_connections.lock().unwrap()
+        // );
+        // let sample: Float = ins.recv.recv().iter().sum();
+        // self.inputs.lock().unwrap().iter().for_each(|con| {
+        //     if con.src_admin {
+        //         self.router.admin_in_s[con.src_module as usize]
+        //             .1
+        //              .0
+        //             .send(())
+        //     } else {
+        //         self.router.in_s[con.src_module as usize].1 .0.send(())
+        //     };
+        // });
+
+        // trace!("Output Module syncing with admin controllers");
+        self.router
+            .admin_in_s
+            .iter()
+            .enumerate()
+            // .skip(1)
+            .for_each(|(_i, (_, (tx, _rx)))| {
+                // trace!("admin module : {_i}");
+                if let Err(e) = tx.send(()) {
+                    error!("Output Module failed to sync with an admin module. got error: {e}");
+                }
+            });
+        // trace!("admin module synced");
+
+        // trace!("Output Module is about to sync with the the other modules");
+        self.router
+            .in_s
+            .iter()
+            .enumerate()
+            .skip(1)
+            .for_each(|(_i, (_, (tx, _rx)))| {
+                // trace!("regular module : {_i}");
+                if let Err(e) = tx.send(()) {
+                    error!("Output Module failed to sync with another module. got error: {e}");
+                }
+            });
+        // trace!("modules synced");
+
+        // trace!("generating samples");
+        let sample: Float = self
+            .inputs
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|con| self.router[*con].sample.lock().unwrap().clone())
+            .sum();
         // info!("sample => {sample}");
 
         Some(sample.tanh() as f32)
@@ -79,8 +168,8 @@ pub struct Output {
 }
 
 impl Output {
-    pub fn new(router_table: Router, mod_id: u8) -> Self {
-        let audio = Audio::new(router_table, mod_id as usize);
+    pub fn new(router_table: Router, sync: Sender<()>) -> Self {
+        let audio = Audio::new(router_table, sync);
         info!("made audio struct to handle audio out");
 
         Self { audio }
@@ -89,7 +178,7 @@ impl Output {
 
 // TODO: make output able to pass its input transparently (so i can visualize audio out)
 impl Module for Output {
-    fn start(&self) -> anyhow::Result<tokio::task::JoinHandle<()>> {
+    fn start(&self) -> anyhow::Result<JoinHandle> {
         info!("Output started");
         let audio = self.audio.clone();
 
@@ -110,21 +199,38 @@ impl Module for Output {
         }))
     }
 
-    // fn connect(&self, _connection: Connection) -> anyhow::Result<()> {
-    //     Ok(())
-    // }
-    //
-    // fn disconnect(&self, _connection: Connection) -> anyhow::Result<()> {
-    //     Ok(())
-    // }
+    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+        if connection.dest_input == 0 {
+            self.audio.inputs.lock().unwrap().push(connection);
+        } else {
+            bail!("invalid input selection");
+        }
 
-    fn n_outputs(&self) -> u8 {
-        N_OUTPUTS
+        Ok(())
     }
 
-    fn connections(&self) -> std::sync::Arc<std::sync::Mutex<Vec<Connection>>> {
-        Arc::new(Mutex::new(Vec::new()))
+    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+        if connection.dest_input == 0 {
+            self.audio
+                .inputs
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else {
+            bail!("invalid input selection");
+        }
+
+        Ok(())
     }
+
+    // fn n_outputs(&self) -> u8 {
+    //     N_OUTPUTS
+    // }
+
+    // fn connections(&self) -> std::sync::Arc<std::sync::Mutex<Vec<Connection>>> {
+    //     // Arc::new(Mutex::new(Vec::new()))
+    //     self.audio.inputs.clone()
+    // }
 }
 
 // pub async fn start(inputs: ModuleInRX) -> Result<((OutputStream, OutputStreamHandle), Audio)> {

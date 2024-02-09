@@ -1,14 +1,13 @@
 use crate::{
     common::{event_loop, Connection, Module},
-    router::{ModuleIn, Router},
-    Float,
+    router::Router,
+    spawn, Float, JoinHandle,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::{
     ops::Deref,
     sync::{Arc, Mutex},
 };
-use tokio::{spawn, task::JoinHandle};
 use tracing::info;
 
 pub mod ad;
@@ -102,17 +101,32 @@ pub struct EnvelopeFilter {
     /// where to send the audio that gets generated
     pub outputs: Arc<Mutex<Vec<Connection>>>,
     /// the thread handle that computes generates the next sample
-    pub generator: Arc<Mutex<JoinHandle<()>>>,
+    pub generator: Arc<Mutex<JoinHandle>>,
     /// the filter that is currently in use
     pub envelope: Arc<Mutex<Box<dyn Envelope>>>,
     /// stores the audio input sample
     pub audio_in: Arc<Mutex<Float>>,
     /// the id which identifies this module from all others
     pub id: u8,
+    pub filter_select_in_cons: Arc<Mutex<Vec<Connection>>>,
+    pub audio_in_cons: Arc<Mutex<Vec<Connection>>>,
+    pub filter_open_cons: Arc<Mutex<Vec<Connection>>>,
+    pub in_cons_4: Arc<Mutex<Vec<Connection>>>,
+    pub in_cons_5: Arc<Mutex<Vec<Connection>>>,
+    pub in_cons_6: Arc<Mutex<Vec<Connection>>>,
+    pub in_cons_7: Arc<Mutex<Vec<Connection>>>,
 }
 
 impl EnvelopeFilter {
     pub fn new(routing_table: Router, id: u8) -> Self {
+        let filter_select_in_cons = Arc::new(Mutex::new(Vec::new()));
+        let audio_in_cons = Arc::new(Mutex::new(Vec::new()));
+        let filter_open_cons = Arc::new(Mutex::new(Vec::new()));
+        let in_cons_4 = Arc::new(Mutex::new(Vec::new()));
+        let in_cons_5 = Arc::new(Mutex::new(Vec::new()));
+        let in_cons_6 = Arc::new(Mutex::new(Vec::new()));
+        let in_cons_7 = Arc::new(Mutex::new(Vec::new()));
+
         Self {
             routing_table,
             filter_type: Arc::new(Mutex::new(FilterType::None)),
@@ -121,19 +135,26 @@ impl EnvelopeFilter {
             envelope: Arc::new(Mutex::new(Box::new(adbdr::Filter::new()))),
             audio_in: Arc::new(Mutex::new(0.0)),
             id,
+            filter_select_in_cons,
+            audio_in_cons,
+            filter_open_cons,
+            in_cons_4,
+            in_cons_5,
+            in_cons_6,
+            in_cons_7,
         }
     }
 }
 
 impl Module for EnvelopeFilter {
-    fn start(&self) -> anyhow::Result<JoinHandle<()>> {
+    fn start(&self) -> anyhow::Result<JoinHandle> {
         let router = self.routing_table.clone();
         let id = self.id as usize;
         // audio output
         let audio = self.audio_in.clone();
         let audio_2 = self.audio_in.clone();
 
-        let outs = self.outputs.clone();
+        // let outs = self.outputs.clone();
         let env_1 = self.envelope.clone();
         let env_2 = self.envelope.clone();
         let env_3 = self.envelope.clone();
@@ -144,16 +165,24 @@ impl Module for EnvelopeFilter {
         // let env_7 = self.envelope.clone();
         let ft = self.filter_type.clone();
 
+        let fs_in_cons = self.filter_select_in_cons.clone();
+        let audio_in_cons = self.audio_in_cons.clone();
+        let filter_open_cons = self.filter_open_cons.clone();
+        let in_mod_in_3 = self.in_cons_4.clone();
+        let in_mod_in_4 = self.in_cons_5.clone();
+        let in_mod_in_5 = self.in_cons_6.clone();
+        let in_mod_in_6 = self.in_cons_7.clone();
+
         Ok(spawn(async move {
-            let ins: Arc<[ModuleIn]> = (*router)
-                .0
-                .get(id)
-                .expect("this ADBDR Envelope Module was not found in the routing table struct.")
-                .clone();
+            // let ins: Arc<[ModuleIn]> = (*router)
+            //     .in_s
+            //     .get(id)
+            //     .expect("this ADBDR Envelope Module was not found in the routing table struct.")
+            //     .clone();
             let gen_sample: Box<dyn FnMut() -> Float + Send> =
                 Box::new(move || audio.lock().unwrap().deref() * env_1.lock().unwrap().step());
 
-            let outputs = vec![(outs, gen_sample)];
+            let outputs = (id, vec![(0, gen_sample)]);
 
             let set_filter_type: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
@@ -212,13 +241,13 @@ impl Module for EnvelopeFilter {
             //     });
 
             let inputs = vec![
-                (&ins[FILTER_SELECT_IN as usize], set_filter_type),
-                (&ins[AUDIO_IN as usize], set_audio),
-                (&ins[FILTER_OPEN_IN as usize], open_filter),
-                (&ins[3], mod_in_0),
-                (&ins[4], mod_in_1),
-                (&ins[5], mod_in_2),
-                (&ins[6], mod_in_3),
+                (fs_in_cons, set_filter_type),
+                (audio_in_cons, set_audio),
+                (filter_open_cons, open_filter),
+                (in_mod_in_3, mod_in_0),
+                (in_mod_in_4, mod_in_1),
+                (in_mod_in_5, mod_in_2),
+                (in_mod_in_6, mod_in_3),
                 // (&ins[7], mod_in_4),
                 // (&ins[AUDIO_IN as usize], set_audio),
                 // (&ins[AUDIO_IN as usize], set_audio),
@@ -230,11 +259,81 @@ impl Module for EnvelopeFilter {
         }))
     }
 
-    fn n_outputs(&self) -> u8 {
-        N_OUTPUTS
+    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.connect_auido_out_to(connection)?;
+        // self.routing_table.inc_connect_counter(connection);
+        // info!("connecting: {connection:?}");
+        if connection.dest_input == FILTER_SELECT_IN {
+            self.filter_select_in_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == AUDIO_IN {
+            self.audio_in_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == FILTER_OPEN_IN {
+            self.filter_open_cons.lock().unwrap().push(connection);
+        } else if connection.dest_input == 3 {
+            self.in_cons_4.lock().unwrap().push(connection);
+        } else if connection.dest_input == 4 {
+            self.in_cons_5.lock().unwrap().push(connection);
+        } else if connection.dest_input == 5 {
+            self.in_cons_6.lock().unwrap().push(connection);
+        } else if connection.dest_input == 6 {
+            self.in_cons_7.lock().unwrap().push(connection);
+        } else {
+            bail!("invalid input selection");
+        }
+
+        Ok(())
     }
 
-    fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
-        self.outputs.clone()
+    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+        // self.disconnect_from(connection)?;
+        // info!("disconnecting: {connection:?}");
+        if connection.dest_input == FILTER_SELECT_IN {
+            self.filter_select_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == AUDIO_IN {
+            self.audio_in_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == FILTER_OPEN_IN {
+            self.filter_open_cons
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == 3 {
+            self.in_cons_4
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == 4 {
+            self.in_cons_5
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == 5 {
+            self.in_cons_6
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else if connection.dest_input == 6 {
+            self.in_cons_7
+                .lock()
+                .unwrap()
+                .retain(|con| *con != connection);
+        } else {
+            bail!("invalid input selection");
+        }
+
+        Ok(())
     }
+
+    // fn n_outputs(&self) -> u8 {
+    //     N_OUTPUTS
+    // }
+    //
+    // fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
+    //     self.outputs.clone()
+    // }
 }
