@@ -1,7 +1,7 @@
 use crate::{common::Connection, Float};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use tracing::{info, trace, warn};
+use tracing::*;
 
 pub type NConnections = u8;
 // one sync per module

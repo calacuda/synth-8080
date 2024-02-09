@@ -131,7 +131,7 @@ impl Iterator for Audio {
             });
         // trace!("modules synced");
 
-        // trace!("generating samples");
+        // trace!("gather samples");
         let sample: Float = self
             .inputs
             .lock()
