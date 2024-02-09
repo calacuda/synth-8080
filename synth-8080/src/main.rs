@@ -1,17 +1,18 @@
+#![feature(exclusive_range_pattern)]
 use anyhow::{bail, Result};
 use common::ModuleType;
-use controller::EnvelopeType;
 use std::mem;
 use tracing::{error, info, warn};
 
-pub mod adbdr;
-pub mod adsr;
+// pub mod adbdr;
+// pub mod adsr;
 pub mod audio_in;
 pub mod chorus;
 pub mod common;
 pub mod controller;
 pub mod delay;
 pub mod echo;
+pub mod envelope;
 pub mod gain;
 pub mod lfo;
 pub mod mid_pass;
@@ -41,17 +42,21 @@ async fn main() -> Result<()> {
     info!("synth begin");
 
     // TODO: read config
+    // TODO: have the controller act as a router to route output from modules to connected inputs
+    // TODO: try spinning up each module as its own OS thread and use unix-sockets to handle
+    // message passing
+    // TODO: test WEBSOCKETS But with the input requesting data from the output, that way every
+    // things stays synced up
     let modules = [
         ModuleType::Output,
         ModuleType::Vco,
+        ModuleType::EnvFilter,
         ModuleType::Lfo,
-        ModuleType::Adbdr,
         ModuleType::Echo,
         // ModuleType::Echo,
-        ModuleType::Adsr,
-        ModuleType::Vco,
-        ModuleType::Adbdr,
-        ModuleType::Adsr,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::EnvFilter,
     ];
 
     let ctrlr = controller::Controller::new(&modules).await.map_or_else(
@@ -62,10 +67,7 @@ async fn main() -> Result<()> {
         |c| Ok(c),
     )?;
     info!("{} modules made", ctrlr.modules.lock().unwrap().len());
-    {
-        let mut filter = ctrlr.envelope_type.lock().unwrap();
-        *filter = EnvelopeType::ADBDR;
-    }
+    // TODO: test changing envelopes
 
     // *** test trem & vibrato *** //
     // ctrlr.connect(1, 0, 0, 0)?;
@@ -82,11 +84,11 @@ async fn main() -> Result<()> {
     // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
 
     // connect vco to output directly
-    ctrlr.connect(1, 0, 0, 0)?;
+    // ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
-    ctrlr.connect(1, 0, 3, adbdr::AUDIO_IN)?;
+    ctrlr.connect(1, 0, 2, envelope::AUDIO_IN)?;
     // connect adbdr to output
-    ctrlr.connect(3, 0, 0, 0)?;
+    ctrlr.connect(2, 0, 0, 0)?;
     // connect adbdr to echo
     // ctrlr.connect(3, 0, 4, echo::AUDIO_INPUT)?;
     // connect echo to output

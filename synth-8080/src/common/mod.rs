@@ -1,5 +1,5 @@
 use crate::{
-    adbdr, adsr, echo, lfo, output,
+    echo, envelope, lfo, output,
     router::{
         mk_module_ins, router_read_sample, router_read_sync, router_send_sample, router_send_sync,
         ModuleIn, ModuleIns, Router,
@@ -22,8 +22,7 @@ pub enum ModuleType {
     Output,
     Lfo,
     Echo,
-    Adbdr,
-    Adsr,
+    EnvFilter,
 }
 
 impl ModuleType {
@@ -33,11 +32,10 @@ impl ModuleType {
 
         let module: Box<dyn Module> = match *self {
             ModuleType::Vco => Box::new(vco::Vco::new(routing_table, id)),
-            ModuleType::Output => Box::new(output::Output::new(routing_table, id).await),
+            ModuleType::Output => Box::new(output::Output::new(routing_table, id)),
             ModuleType::Lfo => Box::new(lfo::Lfo::new(routing_table, id)),
             ModuleType::Echo => Box::new(echo::Echo::new(routing_table, id)),
-            ModuleType::Adbdr => Box::new(adbdr::ADBDRModule::new(routing_table, id)),
-            ModuleType::Adsr => Box::new(adsr::ADSRModule::new(routing_table, id)),
+            ModuleType::EnvFilter => Box::new(envelope::EnvelopeFilter::new(routing_table, id)),
         };
 
         info!("made a {self:?} module");
@@ -106,31 +104,17 @@ impl ModuleType {
                     mod_type: *self,
                 },
             ),
-            ModuleType::Adbdr => (
+            ModuleType::EnvFilter => (
                 ModuleInfo {
-                    n_ins: adbdr::N_INPUTS,
-                    n_outs: adbdr::N_OUTPUTS,
-                    io: mk_module_ins(adbdr::N_INPUTS as usize),
+                    n_ins: envelope::N_INPUTS,
+                    n_outs: envelope::N_OUTPUTS,
+                    io: mk_module_ins(envelope::N_INPUTS as usize),
                     mod_type: *self,
                 },
                 ModuleInfo {
-                    n_ins: adbdr::N_OUTPUTS,
-                    n_outs: adbdr::N_INPUTS,
-                    io: mk_module_ins(adbdr::N_OUTPUTS as usize),
-                    mod_type: *self,
-                },
-            ),
-            ModuleType::Adsr => (
-                ModuleInfo {
-                    n_ins: adsr::N_INPUTS,
-                    n_outs: adsr::N_OUTPUTS,
-                    io: mk_module_ins(adsr::N_INPUTS as usize),
-                    mod_type: *self,
-                },
-                ModuleInfo {
-                    n_ins: adsr::N_OUTPUTS,
-                    n_outs: adsr::N_INPUTS,
-                    io: mk_module_ins(adsr::N_OUTPUTS as usize),
+                    n_ins: envelope::N_OUTPUTS,
+                    n_outs: envelope::N_INPUTS,
+                    io: mk_module_ins(envelope::N_OUTPUTS as usize),
                     mod_type: *self,
                 },
             ),
@@ -141,7 +125,7 @@ impl ModuleType {
 pub struct ModuleInfo {
     pub n_ins: u8,
     pub n_outs: u8,
-    pub io: ModuleIns,
+    pub io: Vec<ModuleIn>,
     pub mod_type: ModuleType,
 }
 
@@ -185,12 +169,41 @@ impl Index<Connection> for Router {
 pub trait Module {
     /// start the modules evvent loop
     fn start(&self) -> anyhow::Result<JoinHandle<()>>;
-    // /// stops the modules event loop
-    // fn stop(&self) -> anyhow::Result<()>;
     /// connects the module to another module
-    fn connect(&self, connection: Connection) -> anyhow::Result<()>;
+    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+        ensure!(
+            connection.src_output < self.n_outputs(),
+            "invalid output selection"
+        );
+        ensure!(
+            !self.connections().lock().unwrap().contains(&connection),
+            "module already connected"
+        );
+        self.connections().lock().unwrap().push(connection);
+
+        Ok(())
+    }
+    /// returns how many outputs the module has
+    fn n_outputs(&self) -> u8;
+    /// returns the Arc<Mutex<Vec<Connection>>> that stores the currently connected connections
+    fn connections(&self) -> Arc<Mutex<Vec<Connection>>>;
     /// disconnects the module from another module
-    fn disconnect(&self, connection: Connection) -> anyhow::Result<()>;
+    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+        ensure!(
+            connection.src_output < self.n_outputs(),
+            "invalid output selection"
+        );
+        ensure!(
+            self.connections().lock().unwrap().contains(&connection),
+            "module not connected"
+        );
+        self.connections()
+            .lock()
+            .unwrap()
+            .retain(|out| *out != connection);
+
+        Ok(())
+    }
 }
 
 pub fn mk_float(b: &[u8]) -> Result<Float> {
@@ -212,19 +225,20 @@ pub fn sync_with_inputs(ins: &mut Vec<(&ModuleIn, Box<dyn FnMut(Vec<Float>) + Se
 
         if n_cons > 0 {
             // info!("syncing with input");
-            // (0..n_cons).for_each(|_| router_send_sync(&cons.input));
+            (0..n_cons).for_each(|_| router_send_sync(&cons.input));
             // router_send_sync(&cons.input);
             // info!("synced with inputs");
 
-            let samples: Vec<Float> = (0..n_cons)
-                .map(|_i| {
-                    // send sync signal
-                    router_send_sync(&cons.input);
-                    // info!("reading sample");
-                    // read sample from connection
-                    router_read_sample(&cons.input)
-                })
-                .collect();
+            // let samples: Vec<Float> = (0..n_cons)
+            //     .map(|_i| {
+            //         // send sync signal
+            //         router_send_sync(&cons.input);
+            //         // info!("reading sample");
+            //         // read sample from connection
+            //         router_read_sample(&cons.input)
+            //     })
+            //     .collect();
+            let samples = router_read_sample(&cons.input);
 
             // if sample.len() > 0 {
             f(samples);
@@ -249,14 +263,11 @@ pub fn send_samples(
 
             if let Err(e) = router_read_sync(router.clone(), *con) {
                 error!("encountered an error waiting for sync message: {e}");
-            } else {
-                // info!("sending sample to: {}:{}", con.dest_module, con.dest_input);
-                // router_send_sample(router.clone(), *con, sample);
             }
-            router_send_sample(router.clone(), *con, sample);
-            // if let Ok(_) = router_read_sync(router.clone(), *con) {
-            //     router_send_sample(router.clone(), *con, sample);
-            // }
+
+            if let Err(e) = router_send_sample(router.clone(), *con, sample) {
+                error!("encountered an error sending sample: {e}");
+            };
         });
     })
 }

@@ -4,7 +4,12 @@ use crate::{
     Float,
 };
 use rodio::{OutputStream, Source};
-use std::{ops::Deref, thread::sleep, time::Duration};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+    thread::sleep,
+    time::Duration,
+};
 use tokio::spawn;
 use tracing::info;
 
@@ -35,14 +40,16 @@ impl Iterator for Audio {
         // let sample = router_read_sample(input);
         // // info!("sample => {sample}");
         let n_cons = ins.active_connections.lock().unwrap();
-        let sample: Float = (0..(*n_cons) as usize)
-            .map(|_i| {
-                router_send_sync(&input);
-                // info!("reading sample");
-                // read sample from connection
-                router_read_sample(&input)
-            })
-            .sum();
+        // let sample: Float = (0..(*n_cons) as usize)
+        //     .map(|_i| {
+        //         router_send_sync(&input);
+        //         // info!("reading sample");
+        //         // read sample from connection
+        //         router_read_sample(&input)
+        //     })
+        //     .sum();
+        (0..(*n_cons) as usize).for_each(|_| router_send_sync(&input));
+        let sample: Float = router_read_sample(&input).iter().sum();
         // info!("sample => {sample}");
 
         Some(sample.tanh() as f32)
@@ -67,8 +74,20 @@ impl Source for Audio {
     }
 }
 
-// TODO: make output able to pass its input transparently (so i can visualize audio out)
+pub struct Output {
+    pub audio: Audio,
+}
 
+impl Output {
+    pub fn new(router_table: Router, mod_id: u8) -> Self {
+        let audio = Audio::new(router_table, mod_id as usize);
+        info!("made audio struct to handle audio out");
+
+        Self { audio }
+    }
+}
+
+// TODO: make output able to pass its input transparently (so i can visualize audio out)
 impl Module for Output {
     fn start(&self) -> anyhow::Result<tokio::task::JoinHandle<()>> {
         info!("Output started");
@@ -91,25 +110,20 @@ impl Module for Output {
         }))
     }
 
-    fn connect(&self, _connection: Connection) -> anyhow::Result<()> {
-        Ok(())
+    // fn connect(&self, _connection: Connection) -> anyhow::Result<()> {
+    //     Ok(())
+    // }
+    //
+    // fn disconnect(&self, _connection: Connection) -> anyhow::Result<()> {
+    //     Ok(())
+    // }
+
+    fn n_outputs(&self) -> u8 {
+        N_OUTPUTS
     }
 
-    fn disconnect(&self, _connection: Connection) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
-
-pub struct Output {
-    pub audio: Audio,
-}
-
-impl Output {
-    pub async fn new(router_table: Router, mod_id: u8) -> Self {
-        let audio = Audio::new(router_table, mod_id as usize);
-        info!("made audio struct to handle audio out");
-
-        Self { audio }
+    fn connections(&self) -> std::sync::Arc<std::sync::Mutex<Vec<Connection>>> {
+        Arc::new(Mutex::new(Vec::new()))
     }
 }
 

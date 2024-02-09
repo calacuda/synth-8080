@@ -92,11 +92,11 @@ impl Module for Echo {
 
         Ok(spawn(async move {
             // prepare call back for event loop
-            let ins: &Vec<ModuleIn> = (*router)
+            let ins: Arc<[ModuleIn]> = (*router)
                 .0
                 .get(id)
                 .expect("this Echo module was not found in the routing table struct.")
-                .as_ref();
+                .clone();
             let gen_sample: Box<dyn FnMut() -> Float + Send> =
                 Box::new(move || buff.lock().unwrap().get_sample(*audio_in.lock().unwrap()));
             let outputs = vec![(outs, gen_sample)];
@@ -132,52 +132,60 @@ impl Module for Echo {
         }))
     }
 
-    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
-        ensure!(
-            connection.src_output < N_OUTPUTS,
-            "invalid output selection"
-        );
-        ensure!(
-            !self.outputs.lock().unwrap().contains(&connection),
-            "module already connected"
-        );
+    // fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+    //     ensure!(
+    //         connection.src_output < N_OUTPUTS,
+    //         "invalid output selection"
+    //     );
+    //     ensure!(
+    //         !self.outputs.lock().unwrap().contains(&connection),
+    //         "module already connected"
+    //     );
+    //
+    //     self.outputs.lock().unwrap().push(connection);
+    //
+    //     info!(
+    //         "connected output: {}, of module: {}, to input: {}, of module: {}",
+    //         connection.src_output,
+    //         connection.src_module,
+    //         connection.dest_input,
+    //         connection.dest_module
+    //     );
+    //
+    //     Ok(())
+    // }
+    //
+    // fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+    //     ensure!(
+    //         connection.src_output < N_OUTPUTS,
+    //         "invalid output selection"
+    //     );
+    //     ensure!(
+    //         self.outputs.lock().unwrap().contains(&connection),
+    //         "module not connected"
+    //     );
+    //
+    //     self.outputs
+    //         .lock()
+    //         .unwrap()
+    //         .retain(|out| *out != connection);
+    //
+    //     info!(
+    //         "connected output: {}, of module: {}, to input: {}, of module: {}",
+    //         connection.src_output,
+    //         connection.src_module,
+    //         connection.dest_input,
+    //         connection.dest_module
+    //     );
+    //
+    //     Ok(())
+    // }
 
-        self.outputs.lock().unwrap().push(connection);
-
-        info!(
-            "connected output: {}, of module: {}, to input: {}, of module: {}",
-            connection.src_output,
-            connection.src_module,
-            connection.dest_input,
-            connection.dest_module
-        );
-
-        Ok(())
+    fn n_outputs(&self) -> u8 {
+        N_OUTPUTS
     }
 
-    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
-        ensure!(
-            connection.src_output < N_OUTPUTS,
-            "invalid output selection"
-        );
-        ensure!(
-            self.outputs.lock().unwrap().contains(&connection),
-            "module not connected"
-        );
-
-        self.outputs
-            .lock()
-            .unwrap()
-            .retain(|out| *out != connection);
-
-        info!(
-            "connected output: {}, of module: {}, to input: {}, of module: {}",
-            connection.src_output,
-            connection.src_module,
-            connection.dest_input,
-            connection.dest_module
-        );
-
-        Ok(())
+    fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
+        self.outputs.clone()
     }
 }

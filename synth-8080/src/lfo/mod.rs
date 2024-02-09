@@ -14,6 +14,7 @@ use tracing::info;
 
 pub const N_INPUTS: u8 = 3;
 pub const N_OUTPUTS: u8 = 1;
+
 pub const PITCH_IN: u8 = 0;
 pub const VOL_IN: u8 = 1;
 pub const OSC_TYPE_IN: u8 = 2;
@@ -144,11 +145,11 @@ impl Lfo {
 
         spawn(async move {
             // prepare call back for event loop
-            let ins: &Vec<ModuleIn> = (*router)
+            let ins: Arc<[ModuleIn]> = (*router)
                 .0
                 .get(id)
                 .expect("this LFO Module was not found in the routing table struct.")
-                .as_ref();
+                .clone();
             let gen_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
                 let sample = osc.lock().unwrap().get_sample() * volume_2.lock().unwrap().deref();
                 // info!("lfo output volume {}", sample);
@@ -182,18 +183,26 @@ impl Module for Lfo {
         Ok(self.start_event_loop())
     }
 
-    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
-        self.connect_auido_out_to(connection)?;
-        // self.routing_table.inc_connect_counter(connection);
-        info!("connecting: {connection:?}");
+    // fn connect(&self, connection: Connection) -> anyhow::Result<()> {
+    //     self.connect_auido_out_to(connection)?;
+    //     // self.routing_table.inc_connect_counter(connection);
+    //     info!("connecting: {connection:?}");
+    //
+    //     Ok(())
+    // }
+    //
+    // fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
+    //     self.disconnect_from(connection)?;
+    //     info!("disconnecting: {connection:?}");
+    //
+    //     Ok(())
+    // }
 
-        Ok(())
+    fn n_outputs(&self) -> u8 {
+        N_OUTPUTS
     }
 
-    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
-        self.disconnect_from(connection)?;
-        info!("disconnecting: {connection:?}");
-
-        Ok(())
+    fn connections(&self) -> Arc<Mutex<Vec<Connection>>> {
+        self.outputs.clone()
     }
 }

@@ -1,135 +1,51 @@
 use crate::{
-    adbdr,
     common::{event_loop, notes::Note, Connection, Module, ModuleInfo, ModuleType},
-    router::{router_send_sample, AllInputs, ModuleIn, Router, RoutingTable},
+    envelope,
+    router::{ModuleIn, Router, RoutingTable},
     vco, Float,
 };
 use anyhow::{bail, ensure, Result};
 use futures::future::join_all;
 use serialport::SerialPort;
 use std::{
-    collections::HashMap,
     io,
-    ops::Index,
     sync::{Arc, Mutex},
 };
-use tokio::{
-    spawn,
-    task::JoinHandle,
-    time::{sleep, Duration},
-};
-use tracing::{error, info, trace, warn};
-
-#[derive(Clone, Copy, Debug)]
-pub enum EnvelopeType {
-    ADBDR,
-    ADSR,
-    // *** Not yet programmed *** //
-
-    // AHDSR,
-    // AD, // maybe NOPE (replaced with adr to stop that anoying pop sound)
-    // AR,
-    // ADR,
-    // ADS, // NOPE
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct EnvelopeFilters {
-    /// the index of the adbdr envelope filter
-    pub adbdr: usize,
-    /// the index of the adsr envelope filter
-    pub adsr: usize,
-    // *** Not yet programmed *** //
-
-    // /// the index of the ahdsr envelope filter
-    // pub ahdsr: usize,
-    // /// the index of the ad envelope filter
-    // pub ad: usize, // maybe NOPE (replaced with adr)
-    // /// the index of the ar envelope filter
-    // pub ar: usize,
-    // /// the index of the adr envelope filter
-    // pub adr: usize,
-    // /// the index of the ads envelope filter
-    // pub ads: usize, // NOPE
-}
-
-impl EnvelopeFilters {
-    pub fn new(i: usize, mod_type_map: &HashMap<ModuleType, Vec<usize>>) -> Result<Self> {
-        Ok(Self {
-            adbdr: mod_type_map
-                .get(&ModuleType::Adbdr)
-                .map_or_else(|| bail!("there were fewer ADBDR filters then VCO_s this is not currently supported."), |val| Ok(val[i]))?,
-            adsr: mod_type_map
-                .get(&ModuleType::Adsr)
-                .map_or_else(|| bail!("there were fewer ADSR filters then VCO_s this is not currently supported."), |val| Ok(val[i]))?,
-        })
-    }
-
-    pub fn get(&self, mod_type: EnvelopeType) -> usize {
-        self[mod_type]
-    }
-}
-
-impl Index<EnvelopeType> for EnvelopeFilters {
-    type Output = usize;
-
-    fn index(&self, index: EnvelopeType) -> &Self::Output {
-        match index {
-            EnvelopeType::ADBDR => &self.adbdr,
-            EnvelopeType::ADSR => &self.adsr,
-        }
-    }
-}
+use tokio::{spawn, task::JoinHandle};
+use tracing::{error, info, warn};
 
 #[derive(Clone, Copy, Debug)]
 pub struct OscilatorId {
     /// the index of the VCO which will synthesis the note,
     pub vco: usize,
-    /// a list of the differnet envelope filters that corespond to `self.vco`
-    pub envelope: EnvelopeFilters,
+    /// the index of the coresponding filter (i.e the filter coreesponding to `self.vco`)
+    pub env: usize,
 }
 
 impl OscilatorId {
-    pub fn new(
-        vco_id: usize,
-        i: usize,
-        mod_type_map: &HashMap<ModuleType, Vec<usize>>,
-    ) -> Result<Self> {
-        Ok(Self {
-            vco: vco_id,
-            envelope: EnvelopeFilters::new(i, &mod_type_map)?,
-        })
-    }
-
     pub fn new_s(mod_types: &[ModuleType]) -> Result<Vec<Self>> {
-        let env_type = [ModuleType::Vco, ModuleType::Adbdr, ModuleType::Adsr];
-        let mut mod_type_map: HashMap<ModuleType, Vec<usize>> = HashMap::new();
+        let mut vco_i_s = Vec::new();
+        let mut filter_i_s = Vec::new();
 
-        env_type.iter().for_each(|mt| {
-            mod_type_map.insert(
-                *mt,
-                mod_types
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, mod_type)| if mod_type == mt { Some(i) } else { None })
-                    .collect(),
-            );
-        });
-
-        info!("{mod_type_map:?}");
-
-        mod_type_map
-            .get(&ModuleType::Vco)
-            .unwrap()
+        mod_types
             .iter()
             .enumerate()
-            .map(|(i, vco_id)| Self::new(*vco_id, i, &mod_type_map))
-            .collect()
+            .for_each(|(i, mod_t)| match mod_t {
+                ModuleType::Vco => vco_i_s.push(i),
+                ModuleType::EnvFilter => filter_i_s.push(i),
+                _ => {}
+            });
+
+        Ok(vco_i_s
+            .into_iter()
+            .zip(filter_i_s.into_iter())
+            .map(|(vco, env)| Self { vco, env })
+            .collect())
     }
 
     /// returns (vco_id, env_id)
-    pub fn get(&self, env_type: EnvelopeType) -> (usize, usize) {
-        (self.vco, self.envelope.get(env_type))
+    pub fn get(&self) -> (usize, usize) {
+        (self.vco, self.env)
     }
 }
 
@@ -144,8 +60,6 @@ pub struct Controller {
     pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// list of the locations of the oscilators and coresponding envelope filters
     pub oscilators: Arc<Mutex<Vec<OscilatorId>>>,
-    /// which envelope filter is active
-    pub envelope_type: Arc<Mutex<EnvelopeType>>,
     /// UART connection to the micro-controller
     pub serial: Arc<Mutex<Box<dyn SerialPort>>>,
     // TODO: find lib to talk to MIDI device
@@ -158,9 +72,11 @@ impl Controller {
         let connections = Vec::new();
         let info = to_build.iter().map(|mod_type| mod_type.get_info());
 
-        let normal_name_space: AllInputs = info.clone().map(|mod_type| mod_type.0.io).collect();
-        let admin_name_space: AllInputs = info.clone().map(|mod_type| mod_type.0.io).collect();
-        let routing_table: Router = Arc::new((normal_name_space, admin_name_space));
+        let normal_name_space: Vec<Arc<[ModuleIn]>> =
+            info.clone().map(|mod_type| mod_type.0.io.into()).collect();
+        let admin_name_space: Vec<Arc<[ModuleIn]>> =
+            info.clone().map(|mod_type| mod_type.0.io.into()).collect();
+        let routing_table: Router = Arc::new((normal_name_space.into(), admin_name_space.into()));
         info!("made routing table");
         // make routing_table
 
@@ -189,7 +105,6 @@ impl Controller {
         info!("started the modules");
 
         let serial = Arc::new(Mutex::new(serialport::new("/dev/ttyACM0", 115200).open()?));
-        let envelope_type = Arc::new(Mutex::new(EnvelopeType::ADBDR));
         let oscilators = Arc::new(Mutex::new(OscilatorId::new_s(to_build)?));
 
         Ok(Self {
@@ -198,7 +113,6 @@ impl Controller {
             routing_table,
             handles,
             oscilators,
-            envelope_type,
             serial,
         })
     }
@@ -210,20 +124,18 @@ impl Controller {
 
         let port = self.serial.clone();
         let osc = self.oscilators.clone();
-        let env_type = self.envelope_type.clone();
         let router = self.routing_table.clone();
         let connections = self.connections.clone();
         let handles = self.handles.clone();
         // handle serial events from micro controller
         // sleep(Duration::from_secs(1)).await
-        let mut serial_buf: Vec<u8> = vec![0; 1000];
         let osc_sample = Arc::new(Mutex::new(0.0));
         let env_sample = Arc::new(Mutex::new(0.0));
         let note = osc_sample.clone();
         let filter_open = env_sample.clone();
 
-        let (osc_id, env_id) = osc.lock().unwrap()[0].get(*env_type.lock().unwrap());
-        info!("osc id => {osc_id}, env id => {env_id}");
+        let (osc_id, env_id) = osc.lock().unwrap()[0].get();
+        // info!("osc id => {osc_id}, env id => {env_id}");
 
         let gen_env_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
             let sample = *env_sample.lock().unwrap();
@@ -234,7 +146,7 @@ impl Controller {
         let jh = Controller::spawn_admin_cmd(
             gen_env_sample,
             env_id as u8,
-            adbdr::ENVELOPE_IN,
+            envelope::FILTER_OPEN_IN,
             router.clone(),
             connections.clone(),
         );
@@ -255,6 +167,8 @@ impl Controller {
             connections.clone(),
         );
         handles.lock().unwrap().push(jh);
+
+        let mut serial_buf: Vec<u8> = vec![0; 1000];
 
         spawn(async move {
             loop {
@@ -305,11 +219,11 @@ impl Controller {
         };
 
         spawn(async move {
-            let ins: &Vec<ModuleIn> = (*router)
+            let ins: Arc<[ModuleIn]> = (*router)
                 .1
                 .get(dest_module as usize)
                 .expect("this VCO Module was not found in the routing table struct.")
-                .as_ref();
+                .clone();
             let outputs = vec![(Arc::new(Mutex::new(vec![con])), gen_sample)];
 
             let do_nothing: Box<dyn FnMut(Vec<Float>) + Send> =

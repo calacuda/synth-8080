@@ -1,15 +1,19 @@
 use crate::{common::Connection, Float};
 use anyhow::bail;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tracing::{error, info};
 
 pub type NConnections = u8;
-pub type ModuleIns = Vec<ModuleIn>;
-pub type AllInputs = Vec<ModuleIns>;
+pub type ModuleIns = Arc<[ModuleIn]>;
+pub type AllInputs = Arc<[ModuleIns]>;
 
-pub type AdminModuleIns = Vec<AdminModuleIn>;
-pub type AllAdminInputs = Vec<AdminModuleIns>;
+// pub type AdminModuleIns = Arc<&[AdminModuleIn]>;
+// pub type AllAdminInputs = Arc<&[AdminModuleIns]>;
 
 // pub type Router = Arc<(AllInputs, AllAdminInputs)>;
 pub type Router = Arc<(AllInputs, AllInputs)>;
@@ -24,8 +28,11 @@ pub trait RoutingTable {
 impl RoutingTable for Router {
     fn inc_connect_counter(&self, connection: Connection) {
         // increment active_connection counter
-        let mut active_cons = self[connection].active_connections.lock().unwrap();
-        *active_cons += 1;
+        *self[connection]
+            .active_connections
+            .lock()
+            .unwrap()
+            .deref_mut() += 1;
         // info!("incremented the active connection counter for connection: {connection:?}");
     }
 
@@ -127,32 +134,41 @@ impl AdminModuleIn {
 //     }
 // }
 
-pub fn router_send_sample(router: Router, con: Connection, value: Float) -> Option<()> {
-    while let Err(e) = router
-        .0
-        .get(con.dest_module as usize)?
-        .get(con.dest_input as usize)?
-        .output
-        .send
-        .send(value)
-    {
-        error!(
-            "could not send sample to input: {}, of module: {}. got error: {e}",
-            con.dest_input, con.dest_module
-        );
-    }
+// pub fn router_send_sample<'a>(router: Router, con: Connection, value: Float) -> anyhow::Result<()> {
+pub fn router_send_sample(router: Router, con: Connection, value: Float) -> anyhow::Result<()> {
+    // while let Err(e) = router
+    //     .0
+    //     .get(con.dest_module as usize)?
+    //     .get(con.dest_input as usize)?
+    //     .output
+    //     .send
+    //     .send(value)
+    // {
+    //     error!(
+    //         "could not send sample to input: {}, of module: {}. got error: {e}",
+    //         con.dest_input, con.dest_module
+    //     );
+    // }
 
-    Some(())
+    router[con].output.send.send(value)?;
+
+    Ok(())
 }
 
-pub fn router_read_sample(input: &ModuleInRX) -> Float {
-    loop {
-        // TODO: consider making this recv ALL samples in the channel (might not be nesseary tho)
-        match input.recv.recv() {
-            Ok(sample) => break sample,
-            Err(e) => error!("failed to recv sample with error: {e}"),
-        }
-    } // .unwrap_or(0.0)
+pub fn router_read_sample(input: &ModuleInRX) -> Vec<Float> {
+    // loop {
+    // // TODO: consider making this recv ALL samples in the channel (might not be nesseary tho)
+
+    // match input.recv.recv() {
+    //     Ok(sample) => sample,
+    //     Err(e) => {
+    //         error!("failed to recv sample with error: {e}");
+    //         // bail!("{e}");
+    //         0.0
+    //     }
+    // }
+    // // } // .unwrap_or(0.0)
+    input.recv.recv().into_iter().collect()
 }
 
 pub fn router_send_sync(input: &ModuleInRX) {
@@ -164,40 +180,58 @@ pub fn router_send_sync(input: &ModuleInRX) {
 }
 
 pub fn router_read_sync(router: Router, con: Connection) -> anyhow::Result<()> {
-    for _ in 0..1_000_000_000 {
-        if let Ok(_) = router
-            .0
-            .get(con.dest_module as usize)
-            .map_or_else(|| bail!("unkown module {}", con.dest_module), |f| Ok(f))?
-            .get(con.dest_input as usize)
-            .map_or_else(
-                || {
-                    bail!(
-                        "unkown input: {} on module {}",
-                        con.dest_input,
-                        con.dest_module
-                    )
-                },
-                |f| Ok(f),
-            )?
-            .output
-            .recv
-            .try_recv()
-        {
-            return Ok(());
-            //     error!("failed to read sync with error {e}");
-            // } else {
-            //     return Ok(());
-        }
-    }
+    // let n_cons = {
+    //     let n_cons = router[con].active_connections.lock().unwrap().clone() as usize;
+    //     n_cons
+    // };
+    //
+    // if n_cons == 0 {
+    //     return Ok(());
+    // }
 
-    bail!("could not read sync signal in time");
+    // for _ in 0..20_000 {
+    //     // if let Ok(_) = router
+    //     //     .0
+    //     //     .get(con.dest_module as usize)
+    //     //     .map_or_else(|| bail!("unkown module {}", con.dest_module), |f| Ok(f))?
+    //     //     .get(con.dest_input as usize)
+    //     //     .map_or_else(
+    //     //         || {
+    //     //             bail!(
+    //     //                 "unkown input: {} on module {}",
+    //     //                 con.dest_input,
+    //     //                 con.dest_module
+    //     //             )
+    //     //         },
+    //     //         |f| Ok(f),
+    //     //     )?
+    //     //     .output
+    //     //     .recv
+    //     //     .recv_timeout(Duration::from_nanos(250))
+    //     // {
+    //     if let Ok(_) = router[con]
+    //         .output
+    //         .recv
+    //         // .recv_timeout(Duration::from_nanos(250))
+    //         .try_recv()
+    //     {
+    //         return Ok(());
+    //         //     error!("failed to read sync with error {e}");
+    //         // } else {
+    //         //     return Ok(());
+    //     }
+    // }
+    router[con].output.recv.recv()?;
+
+    Ok(())
+
+    // bail!("could not read sync signal in time");
 }
 
-pub fn mk_module_ins(n: usize) -> ModuleIns {
+pub fn mk_module_ins(n: usize) -> Vec<ModuleIn> {
     (0..n).into_iter().map(|_| ModuleIn::new()).collect()
 }
 
-pub fn mk_admin_module_ins(n: usize) -> AdminModuleIns {
-    (0..n).into_iter().map(|_| AdminModuleIn::new()).collect()
-}
+// pub fn mk_admin_module_ins(n: usize) -> AdminModuleIns {
+//     (0..n).into_iter().map(|_| AdminModuleIn::new()).collect()
+// }
