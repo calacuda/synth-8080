@@ -8,6 +8,8 @@ pub use tokio::task::spawn;
 pub type JoinHandle = tokio::task::JoinHandle<()>;
 // pub use std::thread::spawn;
 // pub type JoinHandle = std::thread::JoinHandle<()>;
+pub use tokio::sync::mpsc::channel;
+// pub type channel = tokio::sync::
 
 // pub mod adbdr;
 // pub mod adsr;
@@ -32,7 +34,7 @@ pub type Float = f64;
 pub const SAMPLE_RATE: u32 = 48_000;
 pub const FLOAT_LEN: usize = mem::size_of::<Float>();
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 30)]
 async fn main() -> Result<()> {
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
@@ -54,16 +56,22 @@ async fn main() -> Result<()> {
     // message passing
     // TODO: test WEBSOCKETS But with the input requesting data from the output, that way every
     // things stays synced up
+    // TODO: instead of having every input be its own channel have one input channel per module and
+    // add addressing. ALSO have output controlled by controller.
+    // TODO: make it syncronous (just to check to see if its efficient enough).
     let modules = [
-        ModuleType::Output,
+        // ModuleType::Output,
         ModuleType::Vco,
         ModuleType::EnvFilter,
         ModuleType::Lfo,
         ModuleType::Echo,
-        ModuleType::Echo,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
-        ModuleType::EnvFilter,
+        // ModuleType::Echo,
+        // ModuleType::Vco,
+        // ModuleType::Vco,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::EnvFilter,
+        // ModuleType::EnvFilter,
     ];
 
     let ctrlr = controller::Controller::new(&modules).await.map_or_else(
@@ -77,9 +85,9 @@ async fn main() -> Result<()> {
     // TODO: test changing envelopes
 
     // *** test trem & vibrato *** //
-    // ctrlr.connect(1, 0, 0, 0)?;
+    ctrlr.connect(1, 0, 0, 0)?;
     // // connect LFO to VCO volume input
-    // // ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
+    // ctrlr.connect(3, 0, 1, vco::VOLUME_INPUT)?;
     // // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
     // sleep(Duration::from_secs_f64(1.0)).await;
     // ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
@@ -91,7 +99,7 @@ async fn main() -> Result<()> {
     // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
 
     // connect vco to output directly
-    ctrlr.connect(1, 0, 0, 0)?;
+    // ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
     // if let Err(e) = ctrlr.connect(1, 0, 2, envelope::AUDIO_IN) {
     //     error!("{e}");
@@ -110,7 +118,9 @@ async fn main() -> Result<()> {
     // ctrlr.connect(5, 0, 0, 0)?;
 
     // info!("info => {}", ctrlr.module);
-    ctrlr.start().await?;
+    if let Err(e) = ctrlr.start().await {
+        error!("{e}");
+    };
     // sleep(Duration::from_secs(2)).await;
 
     warn!("about to stop syntheses");

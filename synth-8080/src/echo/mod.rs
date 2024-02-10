@@ -89,7 +89,7 @@ impl Echo {
 
 impl Module for Echo {
     fn start(&self) -> anyhow::Result<JoinHandle> {
-        // let outs = self.outputs.clone();
+        let outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let audio_in = self.audio_in.clone();
         let id = self.id as usize;
@@ -112,7 +112,7 @@ impl Module for Echo {
             //     .clone();
             let gen_sample: Box<dyn FnMut() -> Float + Send> =
                 Box::new(move || buff.lock().unwrap().get_sample(*audio_in.lock().unwrap()));
-            let outputs = (id, vec![(0, gen_sample)]);
+            let outputs = (id, vec![(outs, gen_sample)]);
 
             let add_audio: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {

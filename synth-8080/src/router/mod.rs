@@ -32,17 +32,26 @@ pub trait RoutingTable {
 impl RoutingTable for Router {
     fn inc_connect_counter(&self, connection: Connection) {
         // increment active_connection counter
-        let mut counter = self[connection].active_connections.lock().unwrap();
+        let mut counter = self.in_s[connection.dest_module as usize].0
+            [connection.dest_input as usize]
+            .active_connections
+            .lock()
+            .unwrap();
         *counter += 1;
-        info!(
-            "incremented the active connection counter ({counter}) for connection: {}:{}, is admin: {}",
-            connection.dest_module, connection.dest_input, connection.src_admin
-        );
+        // info!(
+        //     "incremented the active connection counter ({counter}) for connection: {}:{} => {}:{}, is admin: {}",
+        //     connection.src_module, connection.src_output, connection.dest_module, connection.dest_input, connection.src_admin
+        // );
     }
 
     fn dec_connect_counter(&self, connection: Connection) {
         // decrement active_connections counter
-        let mut active_cons = self[connection].active_connections.lock().unwrap();
+        let mut active_cons = self.in_s[connection.dest_module as usize].0
+            [connection.dest_input as usize]
+            .active_connections
+            .lock()
+            .unwrap();
+
         *active_cons -= 1;
         // info!("active connections after decrement: {active_cons}");
     }
@@ -64,16 +73,19 @@ pub struct ModuleInTX {
 pub struct ModuleIn {
     pub active_connections: Arc<Mutex<NConnections>>,
     pub sample: Arc<Mutex<Float>>,
+    pub tx_rx: (Sender<Float>, Receiver<Float>),
 }
 
 impl ModuleIn {
     pub fn new() -> Self {
         // change to bounded(0) if there are messaging problems or latency/syncronization issues
         // let (tx, rx): (Sender<Float>, Receiver<Float>) = unbounded();
+        let tx_rx: (Sender<Float>, Receiver<Float>) = unbounded();
 
         ModuleIn {
             active_connections: Arc::new(Mutex::new(0)),
             sample: Arc::new(Mutex::new(0.0)),
+            tx_rx,
         }
     }
 }
@@ -180,7 +192,7 @@ pub fn router_read_sample(input: &ModuleIn) -> Float {
 //     }
 // }
 
-pub fn router_read_sync(router: Router, con: Connection) -> anyhow::Result<()> {
+pub fn router_read_sync(router: Router, _con: Connection) -> anyhow::Result<()> {
     // let n_cons = {
     //     let n_cons = router[con].active_connections.lock().unwrap().clone() as usize;
     //     n_cons

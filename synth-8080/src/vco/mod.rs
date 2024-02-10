@@ -5,6 +5,7 @@ use crate::{
     spawn, Float, JoinHandle,
 };
 use anyhow::{bail, ensure, Result};
+use log::info;
 use std::{
     ops::Deref,
     sync::{Arc, Mutex},
@@ -70,7 +71,7 @@ impl Vco {
         let pitch_bend_in_cons = Arc::new(Mutex::new(Vec::new()));
 
         // DEBUG
-        osc.lock().unwrap().set_frequency(Note::A4.into());
+        // osc.lock().unwrap().set_frequency(Note::A4.into());
         // osc.lock().unwrap().set_overtones(true);
         // osc.lock().unwrap().set_waveform(OscType::Triangle);
 
@@ -144,7 +145,7 @@ impl Vco {
     /// starts a thread to generate samples.
     pub fn start_event_loop(&self) -> JoinHandle {
         let osc = self.osc.clone();
-        // let outs = self.outputs.clone();
+        let outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let volume = self.volume_in.clone();
         let volume_2 = self.volume_in.clone();
@@ -170,12 +171,13 @@ impl Vco {
                 // info!("sample is {sample}");
                 sample * volume_2.lock().unwrap().deref()
             });
-            let outputs = (id, vec![(0, gen_sample)]);
+            let outputs = (id, vec![(outs, gen_sample)]);
             let update_volume: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     let mut v = volume.lock().unwrap();
                     let tmp_v = samples.iter().sum::<Float>().tanh();
                     *v = (tmp_v * 0.5) + 0.5;
+                    info!("volume => {v}");
                 });
             let set_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
@@ -191,6 +193,7 @@ impl Vco {
                     // let mut b = bend.lock().unwrap();
                     let bend = samples.iter().sum::<Float>().tanh();
                     osc_2.lock().unwrap().apply_bend(bend);
+                    info!("bend: {bend}");
                 });
             let inputs = vec![
                 (vol_in_cons, update_volume),
@@ -221,13 +224,16 @@ impl Module for Vco {
     fn connect(&self, connection: Connection) -> anyhow::Result<()> {
         // self.connect_auido_out_to(connection)?;
         // self.routing_table.inc_connect_counter(connection);
-        // info!("connecting: {connection:?}");
-        if connection.dest_input == VOLUME_INPUT {
+        info!("self.id = {}:  connecting: {connection:?}", self.id);
+        if connection.dest_module == self.id && connection.dest_input == VOLUME_INPUT {
             self.volume_in_cons.lock().unwrap().push(connection);
-        } else if connection.dest_input == PITCH_INPUT {
+        } else if connection.dest_module == self.id && connection.dest_input == PITCH_INPUT {
+            info!("pitch in");
             self.pitch_in_cons.lock().unwrap().push(connection);
-        } else if connection.dest_input == PITCH_BEND_INPUT {
+        } else if connection.dest_module == self.id && connection.dest_input == PITCH_BEND_INPUT {
             self.pitch_bend_in_cons.lock().unwrap().push(connection);
+        } else if connection.src_module == self.id && connection.src_output == 0 {
+            self.outputs.lock().unwrap().push(connection);
         } else {
             bail!("invalid input selection");
         }

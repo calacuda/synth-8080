@@ -144,7 +144,7 @@ impl Lfo {
     pub fn start_event_loop(&self) -> JoinHandle {
         // let empty_vec = Vec::new();
         let osc = self.osc.clone();
-        // let audio_outs = self.outputs.clone();
+        let audio_outs = self.outputs.clone();
         let router = self.routing_table.clone();
         let volume = self.volume_in.clone();
         let volume_2 = self.volume_in.clone();
@@ -171,7 +171,7 @@ impl Lfo {
                     let mut v = volume.lock().unwrap();
                     *v = samples.iter().sum::<Float>() / (samples.len() as Float);
                 });
-            let outputs = (id, vec![(0, gen_sample)]);
+            let outputs = (id, vec![(audio_outs, gen_sample)]);
             let update_pitch: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     let mut p = pitch.lock().unwrap();

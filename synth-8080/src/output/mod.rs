@@ -26,14 +26,14 @@ pub struct Audio {
 impl Audio {
     pub fn new(router: Router, sync: Sender<()>) -> Self {
         let inputs = Arc::new(Mutex::new(Vec::new()));
-        let size = router.in_s.len() - 1;
+        let size = router.in_s.len() * 2;
         // (*router.in_s)
         //     .iter()
         //     .flat_map(|a| a.iter())
         //     .collect::<Vec<_>>()
         //     .len();
 
-        (0..size * 2).for_each(|_i| {
+        (0..size).for_each(|_i| {
             // warn!("initial first i: {i}");
 
             if let Err(e) = sync.send(()) {
@@ -109,9 +109,9 @@ impl Iterator for Audio {
             .iter()
             .enumerate()
             // .skip(1)
-            .for_each(|(_i, (_, (tx, _rx)))| {
+            .for_each(|(_i, (_, (sync_tx, _sync_rx)))| {
                 // trace!("admin module : {_i}");
-                if let Err(e) = tx.send(()) {
+                if let Err(e) = sync_tx.send(()) {
                     error!("Output Module failed to sync with an admin module. got error: {e}");
                 }
             });
@@ -122,22 +122,19 @@ impl Iterator for Audio {
             .in_s
             .iter()
             .enumerate()
-            .skip(1)
-            .for_each(|(_i, (_, (tx, _rx)))| {
+            // .skip(1)
+            .for_each(|(_i, (_, (sync_tx, _sync_rx)))| {
                 // trace!("regular module : {_i}");
-                if let Err(e) = tx.send(()) {
+                if let Err(e) = sync_tx.send(()) {
                     error!("Output Module failed to sync with another module. got error: {e}");
                 }
             });
         // trace!("modules synced");
 
         // trace!("gather samples");
-        let sample: Float = self
-            .inputs
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|con| self.router[*con].sample.lock().unwrap().clone())
+        let sample: Float = (0..*self.router.in_s[0].0[0].active_connections.lock().unwrap())
+            .map(|_| self.router.in_s[0].0[0].tx_rx.1.recv().unwrap_or(0.0))
+            // .flatten()
             .sum();
         // info!("sample => {sample}");
 
@@ -199,28 +196,32 @@ impl Module for Output {
         }))
     }
 
-    fn connect(&self, connection: Connection) -> anyhow::Result<()> {
-        if connection.dest_input == 0 {
-            self.audio.inputs.lock().unwrap().push(connection);
-        } else {
-            bail!("invalid input selection");
-        }
+    fn connect(&self, _connection: Connection) -> anyhow::Result<()> {
+        // trace!("connection => {:?}", connection);
+        // if connection.dest_input == 0 {
+        //     info!("connecting to output");
+        //     self.audio.inputs.lock().unwrap().push(connection);
+        // } else {
+        //     bail!("invalid input selection");
+        // }
 
-        Ok(())
+        bail!("invalid input selection");
+
+        // Ok(())
     }
 
-    fn disconnect(&self, connection: Connection) -> anyhow::Result<()> {
-        if connection.dest_input == 0 {
-            self.audio
-                .inputs
-                .lock()
-                .unwrap()
-                .retain(|con| *con != connection);
-        } else {
-            bail!("invalid input selection");
-        }
+    fn disconnect(&self, _connection: Connection) -> anyhow::Result<()> {
+        // if connection.dest_input == 0 {
+        //     self.audio
+        //         .inputs
+        //         .lock()
+        //         .unwrap()
+        //         .retain(|con| *con != connection);
+        // } else {
+        bail!("invalid input selection");
+        // }
 
-        Ok(())
+        // Ok(())
     }
 
     // fn n_outputs(&self) -> u8 {

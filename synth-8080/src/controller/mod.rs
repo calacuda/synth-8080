@@ -6,7 +6,7 @@ use crate::{
     spawn, vco, Float, JoinHandle,
 };
 use anyhow::{bail, ensure, Result};
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use futures::future::join_all;
 use serialport::SerialPort;
 use std::{
@@ -180,12 +180,13 @@ impl Controller {
             envelope::FILTER_OPEN_IN,
             router.clone(),
             connections.clone(),
+            self.modules.clone(),
         );
         handles.lock().unwrap().push(jh);
 
         let gen_osc_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
             // info!("about to send pitch");
-            let sample = osc_sample.lock().unwrap().clone();
+            let sample = *osc_sample.lock().unwrap();
             // info!("setting vco pitch to {sample}");
 
             sample
@@ -198,16 +199,20 @@ impl Controller {
             vco::PITCH_INPUT,
             router.clone(),
             connections.clone(),
+            self.modules.clone(),
         );
         handles.lock().unwrap().push(jh);
 
         let mut serial_buf: Vec<u8> = vec![0; 1000];
 
+        // TODO: Maybe uneeded
         let mut jh_s = self.consume_admin_syncs(&[osc_id, env_id]);
         handles.lock().unwrap().append(&mut jh_s);
+        trace!("starting controller thread");
 
         spawn(async move {
             loop {
+                // trace!("inside controller serial read loop");
                 match port.lock().unwrap().read(serial_buf.as_mut_slice()) {
                     Ok(t) => {
                         let raw_input = String::from_utf8_lossy(&serial_buf[..t]);
@@ -216,7 +221,7 @@ impl Controller {
                         info!("recieved command: {cmd:?}");
 
                         if cmd == "play" {
-                            // info!("setting Notes");
+                            info!("setting Notes");
                             let mut os = note.lock().unwrap();
                             *os = Note::A4.into();
 
@@ -279,6 +284,7 @@ impl Controller {
         dest_input: u8,
         router: Router,
         connections: Arc<Mutex<Vec<Connection>>>,
+        modules: Arc<Mutex<Vec<(ModuleInfo, Box<dyn Module>)>>>,
     ) -> JoinHandle {
         let con = Connection {
             src_module: dest_module,
@@ -288,6 +294,25 @@ impl Controller {
             src_admin: true,
             dest_admin: false,
         };
+        trace!("entered spawn_admin_cmd");
+        // let modules = self.modules.clone();
+        let outputs = (
+            dest_module as usize,
+            vec![((dest_module as usize, dest_input as usize), gen_sample)],
+        );
+
+        // let do_nothing: Box<dyn FnMut(Vec<Float>) + Send> =
+        //     Box::new(move |_samples: Vec<Float>| warn!("doing nothing"));
+        // let inputs = vec![(&ins[dest_input as usize], do_nothing)];
+        trace!("spawning admin connection: {con:?}");
+
+        if let Err(e) = modules.lock().unwrap()[dest_module as usize].1.connect(con) {
+            error!("no connection made. encountered error: {e}");
+            return spawn(async move {});
+        }
+
+        connections.lock().unwrap().push(con);
+        router.inc_connect_counter(con);
 
         spawn(async move {
             // let ins: Arc<[ModuleIn]> = (*router)
@@ -296,14 +321,6 @@ impl Controller {
             //     .expect("this Controller Module was not found in the routing table struct.")
             //     .0
             //     .clone();
-            let outputs = (dest_module as usize, vec![(0, gen_sample)]);
-
-            // let do_nothing: Box<dyn FnMut(Vec<Float>) + Send> =
-            //     Box::new(move |_samples: Vec<Float>| warn!("doing nothing"));
-            // let inputs = vec![(&ins[dest_input as usize], do_nothing)];
-
-            connections.lock().unwrap().push(con);
-            router.inc_connect_counter(con);
             admin_event_loop(
                 router.clone(),
                 // router.admin_in_s[dest_module as usize].1 .1,
@@ -339,13 +356,23 @@ impl Controller {
             "the requested connection is already made"
         );
 
-        if let Err(e) = self.modules.lock().unwrap()[dest_module as usize]
+        trace!("connecting");
+
+        if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
             .1
             .connect(con)
         {
             error!("no connection made. encountered error: {e}");
             bail!(e);
         }
+
+        // if let Err(e) = self.modules.lock().unwrap()[dest_module as usize]
+        //     .1
+        //     .connect(con)
+        // {
+        //     error!("no connection made. encountered error: {e}");
+        //     bail!(e);
+        // }
 
         self.connections.lock().unwrap().push(con);
         self.routing_table.inc_connect_counter(con);
@@ -377,7 +404,7 @@ impl Controller {
 
         // the counter must be decremented first to avoid the synth seezing up
         self.routing_table.dec_connect_counter(con);
-        if let Err(e) = self.modules.lock().unwrap()[dest_module as usize]
+        if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
             .1
             .disconnect(con)
         {

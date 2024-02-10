@@ -8,7 +8,7 @@ use std::{
     ops::Deref,
     sync::{Arc, Mutex},
 };
-use tracing::info;
+use tracing::*;
 
 pub mod ad;
 pub mod adbdr;
@@ -45,6 +45,7 @@ pub trait Envelope: Send {
 
     fn step_env(&mut self) {
         let new_env = self.get_env() + self.get_step();
+        // trace!("ADBDR envelope value {}", new_env);
         self.set_env(new_env);
     }
 
@@ -154,7 +155,7 @@ impl Module for EnvelopeFilter {
         let audio = self.audio_in.clone();
         let audio_2 = self.audio_in.clone();
 
-        // let outs = self.outputs.clone();
+        let outs = self.outputs.clone();
         let env_1 = self.envelope.clone();
         let env_2 = self.envelope.clone();
         let env_3 = self.envelope.clone();
@@ -182,7 +183,7 @@ impl Module for EnvelopeFilter {
             let gen_sample: Box<dyn FnMut() -> Float + Send> =
                 Box::new(move || audio.lock().unwrap().deref() * env_1.lock().unwrap().step());
 
-            let outputs = (id, vec![(0, gen_sample)]);
+            let outputs = (id, vec![(outs, gen_sample)]);
 
             let set_filter_type: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
@@ -212,6 +213,7 @@ impl Module for EnvelopeFilter {
             let open_filter: Box<dyn FnMut(Vec<Float>) + Send> =
                 Box::new(move |samples: Vec<Float>| {
                     // let sample = samples.iter().sum::<Float>().tanh();
+                    // info!("open_filter");
                     env_7.lock().unwrap().open_filter(samples);
                 });
 

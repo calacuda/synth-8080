@@ -1,7 +1,7 @@
 use super::Envelope;
 use crate::{Float, SAMPLE_RATE};
 use anyhow::{bail, Result};
-use tracing::info;
+use tracing::*;
 
 pub const ATTACK_IN: u8 = 3; // sets attack speed in seconds
 pub const DECAY_1_IN: u8 = 4; // sets decay 1 speed in seconds
@@ -111,6 +111,7 @@ impl Filter {
 
 impl Envelope for Filter {
     fn get_env(&mut self) -> Float {
+        // trace!("ADBDR envelope value {}", self.env);
         self.env
     }
 
