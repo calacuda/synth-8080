@@ -1,8 +1,6 @@
 use crate::{common::bend_range, Float};
 use serde::Deserialize;
-use tracing::info;
 
-// pub mod sin_wt;
 pub mod saw;
 pub mod sine;
 pub mod square;
@@ -99,10 +97,6 @@ impl Oscilator {
     /// applies a pitch bend by changing the oscilators frequency
     pub fn apply_bend(&mut self, bend: Float) {
         let note = self.frequency;
-        // let note: Float = (*note).clone().into();
-
-        // get frequency shift
-        // self.note + (bend * )
 
         let new_note = if bend > 0.0 {
             let shift = note * self.bend;

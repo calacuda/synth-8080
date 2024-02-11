@@ -1,7 +1,6 @@
-use crate::{common::Module, output, Float, JoinHandle};
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
-use rodio::{OutputStream, OutputStreamHandle, Source};
-use std::sync::{Arc, Mutex};
+use crate::{common::Module, Float, JoinHandle};
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use rodio::{OutputStream, Source};
 use tokio::spawn;
 use tracing::*;
 
@@ -17,24 +16,6 @@ pub struct Audio {
 
 impl Audio {
     pub fn new(ext_sync: Sender<()>, int_sync: Receiver<Float>) -> Self {
-        // let inputs = Arc::new(Mutex::new(Vec::new()));
-        // let size = router.in_s.len() * 2;
-        // // (*router.in_s)
-        // //     .iter()
-        // //     .flat_map(|a| a.iter())
-        // //     .collect::<Vec<_>>()
-        // //     .len();
-        //
-        // (0..size).for_each(|_i| {
-        //     // warn!("initial first i: {i}");
-        //
-        //     if let Err(e) = sync.send(()) {
-        //         error!("failed sending sync: {e}");
-        //     }
-        //     // warn!("initial first i: {i}");
-        // });
-        // // warn!("router len: {}", router.in_s.len());
-
         Self { ext_sync, int_sync }
     }
 }
@@ -69,14 +50,11 @@ impl Source for Audio {
 }
 
 pub struct Output {
-    // pub audio: Audio,
-    // /// used to request new data from the
-    // ext_sync: Sender<()>,
     /// used for internal syncronization
     int_sync: Sender<Float>,
     // recv: Receiver<Float>,
     sample: Float,
-    stream: OutputStream,
+    _stream: OutputStream,
 }
 
 impl Output {
@@ -85,7 +63,7 @@ impl Output {
         let sample = 0.0;
         let (int_sync, rx) = unbounded();
         let audio = Audio::new(ext_sync, rx);
-        let (stream, stream_handle) = OutputStream::try_default().unwrap();
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         info!("playing audio struct");
 
         (
@@ -94,7 +72,7 @@ impl Output {
                 // ext_sync,
                 int_sync,
                 sample,
-                stream,
+                _stream,
             },
             spawn(async move {
                 stream_handle.play_raw(audio).unwrap();
@@ -103,7 +81,6 @@ impl Output {
     }
 }
 
-// TODO: make output able to pass its input transparently (so i can visualize audio out)
 impl Module for Output {
     async fn get_samples(&mut self) -> Vec<(u8, Float)> {
         vec![(0, self.sample)]
@@ -119,78 +96,3 @@ impl Module for Output {
         };
     }
 }
-
-// fn start(&self) -> anyhow::Result<JoinHandle> {
-//     info!("Output started");
-//     let audio = self.audio.clone();
-//
-//     Ok(spawn(async move {
-//         // let delay = sleep(Duration::from_nanos(1));
-//         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-//         let res = stream_handle.play_raw(audio);
-//         // delay.await;
-//
-//         info!("stream result: {res:?}");
-//         info!("playing generated audio");
-//
-//         loop {
-//             sleep(Duration::from_secs(1));
-//         }
-//
-//         // warn!("stopping audio playback");
-//     }))
-// }
-//
-// fn connect(&self, _connection: Connection) -> anyhow::Result<()> {
-//     // trace!("connection => {:?}", connection);
-//     // if connection.dest_input == 0 {
-//     //     info!("connecting to output");
-//     //     self.audio.inputs.lock().unwrap().push(connection);
-//     // } else {
-//     //     bail!("invalid input selection");
-//     // }
-//
-//     bail!("invalid input selection");
-//
-//     // Ok(())
-// }
-//
-// fn disconnect(&self, _connection: Connection) -> anyhow::Result<()> {
-//     // if connection.dest_input == 0 {
-//     //     self.audio
-//     //         .inputs
-//     //         .lock()
-//     //         .unwrap()
-//     //         .retain(|con| *con != connection);
-//     // } else {
-//     bail!("invalid input selection");
-//     // }
-//
-//     // Ok(())
-// }
-
-// fn n_outputs(&self) -> u8 {
-//     N_OUTPUTS
-// }
-
-// fn connections(&self) -> std::sync::Arc<std::sync::Mutex<Vec<Connection>>> {
-//     // Arc::new(Mutex::new(Vec::new()))
-//     self.audio.inputs.clone()
-// }
-// }
-
-// pub async fn start(inputs: ModuleInRX) -> Result<((OutputStream, OutputStreamHandle), Audio)> {
-//     let audio = Audio::new(inputs);
-//     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-//     stream_handle.play_raw(audio.clone())?;
-//
-//     Ok(((_stream, stream_handle), audio))
-// }
-
-// pub async fn prepare() -> ModuleInfo {
-//     ModuleInfo {
-//         n_ins: 1,
-//         n_outs: 0,
-//         io: mk_module_ins(1),
-//     }
-// }

@@ -316,94 +316,6 @@ impl Controller {
         }
     }
 
-    // fn consume_admin_syncs(&self, module_black_list: &[usize]) -> Vec<JoinHandle> {
-    //     // let router = self.routing_table.clone();
-    //
-    //     // if let Err(e) = router.admin_in_s[outputs.0].1 .1.recv() {
-    //     //     error!("admin sync recv failed with error: {e}");
-    //     // }
-    //
-    //     self.routing_table
-    //         .admin_in_s
-    //         .iter()
-    //         .enumerate()
-    //         // .skip(1)
-    //         .filter_map(|(i, (_, (_tx, rx)))| {
-    //             let recv = rx.clone();
-    //
-    //             if !module_black_list.contains(&i) {
-    //                 Some(
-    //                     spawn(async move {
-    //                         trace!("starting consumer for admin module : {i}");
-    //
-    //                         loop {
-    //                             if let Err(e) = recv.recv() {
-    //                                 error!(
-    //                                     "module id: {i} failed to consume an admin sync signal. got error: {e}"
-    //                                 );
-    //                             };
-    //                         }
-    //                     })
-    //                 )
-    //             } else {
-    //                 None
-    //             }
-    //         }).collect()
-    // }
-
-    // /// sends a samples to destnation module and input
-    // pub fn spawn_admin_cmd(
-    //     gen_sample: Box<dyn FnMut() -> Float + Send>,
-    //     dest_module: u8,
-    //     dest_input: u8,
-    //     router: Router,
-    //     connections: Arc<Mutex<Vec<Connection>>>,
-    //     modules: Arc<Mutex<Vec<(ModuleInfo, Box<dyn Module>)>>>,
-    // ) -> JoinHandle {
-    //     let con = Connection {
-    //         src_module: dest_module,
-    //         src_output: dest_input,
-    //         dest_module,
-    //         dest_input,
-    //         src_admin: true,
-    //         dest_admin: false,
-    //     };
-    //     trace!("entered spawn_admin_cmd");
-    //     // let modules = self.modules.clone();
-    //     let outputs = (
-    //         dest_module as usize,
-    //         vec![((dest_module as usize, dest_input as usize), gen_sample)],
-    //     );
-    //
-    //     // let do_nothing: Box<dyn FnMut(Vec<Float>) + Send> =
-    //     //     Box::new(move |_samples: Vec<Float>| warn!("doing nothing"));
-    //     // let inputs = vec![(&ins[dest_input as usize], do_nothing)];
-    //     trace!("spawning admin connection: {con:?}");
-    //
-    //     if let Err(e) = modules.lock().unwrap()[dest_module as usize].1.connect(con) {
-    //         error!("no connection made. encountered error: {e}");
-    //         return spawn(async move {});
-    //     }
-    //
-    //     connections.lock().unwrap().push(con);
-    //     router.inc_connect_counter(con);
-    //
-    //     spawn(async move {
-    //         // let ins: Arc<[ModuleIn]> = (*router)
-    //         //     .in_s
-    //         //     .get(dest_module as usize)
-    //         //     .expect("this Controller Module was not found in the routing table struct.")
-    //         //     .0
-    //         //     .clone();
-    //         admin_event_loop(
-    //             router.clone(),
-    //             // router.admin_in_s[dest_module as usize].1 .1,
-    //             outputs,
-    //         )
-    //         .await;
-    //     })
-    // }
-
     /// connects src module to dest module
     pub fn connect(
         &mut self,
@@ -428,29 +340,10 @@ impl Controller {
             "the requested connection is already made"
         );
 
-        // trace!("connecting");
-        // info!("{con:?}");
-        // info!("{:?}", self.modules.indeces[con.src_module as usize]);
-
-        // if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
-        //     .1
-        //     .connect(con)
-        // {
-        //     error!("no connection made. encountered error: {e}");
-        //     bail!(e);
-        // }
-
-        // if let Err(e) = self.modules.lock().unwrap()[dest_module as usize]
-        //     .1
-        //     .connect(con)
-        // {
-        //     error!("no connection made. encountered error: {e}");
-        //     bail!(e);
-        // }
+        trace!("connecting");
 
         // self.src_s.insert(src_module as usize);
         self.connections.lock().unwrap().push(con);
-        // self.routing_table.inc_connect_counter(con);
 
         Ok(())
     }
@@ -475,42 +368,14 @@ impl Controller {
             "the requested connection is possible made, not disconnecting"
         );
 
-        // // the counter must be decremented first to avoid the synth seezing up
-        // self.routing_table.dec_connect_counter(con);
-        // if let Err(e) = self.modules.lock().unwrap()[src_module as usize]
-        //     .1
-        //     .disconnect(con)
-        // {
-        //     self.routing_table.inc_connect_counter(con);
-        //     bail!(e);
-        // }
         self.connections.lock().unwrap().retain(|c| c != &con);
-        // TODO: if no connections with src = src_module remove src_mod
 
         Ok(())
     }
 
     /// disconnects all connections
     pub fn disconnect_all(&mut self) {
-        // self.routing_table.in_s.iter().for_each(|mod_ins| {
-        //     mod_ins.0.iter().for_each(|mod_in| {
-        //         let mut ac = mod_in.active_connections.lock().unwrap();
-        //         *ac = 0;
-        //     })
-        // });
-        // self.connections.lock().unwrap().iter().for_each(|con| {
-        //     self.modules.lock().unwrap().iter().for_each(|module| {
-        //         let _ = module.1.disconnect(con.clone());
-        //     })
-        // });
         self.connections.lock().unwrap().clear();
-
-        // self.routing_table.1.iter().for_each(|mod_ins| {
-        //     mod_ins.iter().for_each(|mod_in| {
-        //         let mut ac = mod_in.active_connections.lock().unwrap();
-        //         *ac = 0;
-        //     })
-        // });
     }
 
     /// returns `true` if the connection can be made.
