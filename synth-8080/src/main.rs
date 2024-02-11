@@ -1,8 +1,10 @@
 #![feature(exclusive_range_pattern)]
 use anyhow::{bail, Result};
 use common::ModuleType;
+use rodio::OutputStream;
 use std::mem;
-use tracing::{error, info, warn, Level};
+use tokio::join;
+use tracing::{error, info, Level};
 
 pub use tokio::task::spawn;
 pub type JoinHandle = tokio::task::JoinHandle<()>;
@@ -65,27 +67,27 @@ async fn main() -> Result<()> {
         ModuleType::EnvFilter,
         ModuleType::Lfo,
         ModuleType::Echo,
-        // ModuleType::Echo,
-        // ModuleType::Vco,
-        // ModuleType::Vco,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::EnvFilter,
-        // ModuleType::EnvFilter,
+        ModuleType::Echo,
+        ModuleType::Vco,
+        ModuleType::Vco,
+        ModuleType::Vco,
+        ModuleType::EnvFilter,
+        ModuleType::EnvFilter,
+        ModuleType::EnvFilter,
     ];
 
-    let ctrlr = controller::Controller::new(&modules).await.map_or_else(
+    let (mut ctrlr, audio_handle) = controller::Controller::new(&modules).await.map_or_else(
         |e| {
             error!("{e}");
             bail!(e);
         },
         |c| Ok(c),
     )?;
-    info!("{} modules made", ctrlr.modules.lock().unwrap().len());
+    info!("{} modules made", modules.len());
     // TODO: test changing envelopes
 
     // *** test trem & vibrato *** //
-    ctrlr.connect(1, 0, 0, 0)?;
+    // ctrlr.connect(1, 0, 0, 0)?;
     // // connect LFO to VCO volume input
     // ctrlr.connect(3, 0, 1, vco::VOLUME_INPUT)?;
     // // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
@@ -101,36 +103,33 @@ async fn main() -> Result<()> {
     // connect vco to output directly
     // ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
-    // if let Err(e) = ctrlr.connect(1, 0, 2, envelope::AUDIO_IN) {
-    //     error!("{e}");
-    // };
+    if let Err(e) = ctrlr.connect(1, 0, 2, envelope::AUDIO_IN) {
+        error!("{e}");
+    };
     // connect adbdr to output
     // if let Err(e) = ctrlr.connect(2, 0, 0, 0) {
     //     error!("{e}");
     // }
     // connect adbdr to echo
-    // ctrlr.connect(3, 0, 4, echo::AUDIO_INPUT)?;
+    ctrlr.connect(2, 0, 4, echo::AUDIO_INPUT)?;
     // connect echo to output
-    // ctrlr.connect(4, 0, 0, 0)?;
+    ctrlr.connect(4, 0, 0, 0)?;
     // connect vco to adsr
     // ctrlr.connect(1, 0, 5, adsr::AUDIO_IN)?;
     // connect adsr to output
     // ctrlr.connect(5, 0, 0, 0)?;
 
     // info!("info => {}", ctrlr.module);
-    if let Err(e) = ctrlr.start().await {
-        error!("{e}");
-    };
+    let hardware_handle = ctrlr.start_harware();
+    let synth_handle = ctrlr.step();
+    // stream_handle.play_raw(ctrlr.output)?;
+
+    join!(synth_handle, hardware_handle, audio_handle);
     // sleep(Duration::from_secs(2)).await;
 
-    warn!("about to stop syntheses");
-    ctrlr
-        .handles
-        .lock()
-        .unwrap()
-        .iter()
-        .for_each(|handle| handle.abort());
-    info!("syntheses stopped");
+    // warn!("about to stop syntheses");
+
+    // info!("syntheses stopped");
 
     Ok(())
 }
