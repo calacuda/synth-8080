@@ -1,7 +1,6 @@
 use super::Osc;
 use crate::Float;
 use fon::chan::Channel;
-use tracing::info;
 use twang::noise::White;
 use twang::ops::Gain;
 use twang::osc::Sine;

@@ -52,26 +52,31 @@ async fn main() -> Result<()> {
     info!("synth begin");
 
     // TODO: read config
-    // TODO: have the controller act as a router to route output from modules to connected inputs
-    // TODO: try spinning up each module as its own OS thread and use unix-sockets to handle
-    // message passing
-    // TODO: test WEBSOCKETS But with the input requesting data from the output, that way every
-    // things stays synced up
-    // TODO: instead of having every input be its own channel have one input channel per module and
-    // add addressing. ALSO have output controlled by controller.
-    // TODO: make it syncronous (just to check to see if its efficient enough).
     let modules = [
         // ModuleType::Output,
         ModuleType::Vco,
         ModuleType::EnvFilter,
         ModuleType::Lfo,
         ModuleType::Echo,
+        ModuleType::Chorus,
         ModuleType::Echo,
         ModuleType::Vco,
         ModuleType::Vco,
         ModuleType::Vco,
         ModuleType::EnvFilter,
         ModuleType::EnvFilter,
+        ModuleType::EnvFilter,
+        ModuleType::Vco,
+        ModuleType::EnvFilter,
+        ModuleType::Vco,
+        ModuleType::EnvFilter,
+        ModuleType::Vco,
+        ModuleType::EnvFilter,
+        ModuleType::Vco,
+        ModuleType::EnvFilter,
+        ModuleType::Vco,
+        ModuleType::EnvFilter,
+        ModuleType::Vco,
         ModuleType::EnvFilter,
     ];
 
@@ -106,17 +111,15 @@ async fn main() -> Result<()> {
         error!("{e}");
     };
     // connect adbdr to output
-    // if let Err(e) = ctrlr.connect(2, 0, 0, 0) {
-    //     error!("{e}");
-    // }
+    // ctrlr.connect(2, 0, 0, 0)?;
     // connect adbdr to echo
     ctrlr.connect(2, 0, 4, echo::AUDIO_INPUT)?;
     // connect echo to output
     ctrlr.connect(4, 0, 0, 0)?;
-    // connect vco to adsr
-    // ctrlr.connect(1, 0, 5, adsr::AUDIO_IN)?;
-    // connect adsr to output
-    // ctrlr.connect(5, 0, 0, 0)?;
+    // connect adbdr to chorus
+    ctrlr.connect(2, 0, 5, chorus::AUDIO_INPUT)?;
+    // connect chorus to output
+    ctrlr.connect(5, 0, 0, 0)?;
 
     // info!("info => {}", ctrlr.module);
     let hardware_handle = ctrlr.start_harware();

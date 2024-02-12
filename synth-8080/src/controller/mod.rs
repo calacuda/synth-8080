@@ -164,69 +164,9 @@ impl Controller {
     pub fn start_harware(&mut self) -> JoinHandle {
         //     info!("starting controller event loop");
         //     // TODO: trun LED red
-        //
-        //     let port = self.serial.clone();
-        //     let osc = self.oscilators.clone();
-        //     let router = self.routing_table.clone();
-        //     let connections = self.connections.clone();
-        //     let handles = self.handles.clone();
-        //     let osc_sample = Arc::new(Mutex::new(0.0));
-        //     let env_sample = Arc::new(Mutex::new(0.0));
-        //     let note = osc_sample.clone();
-        //     let filter_open = env_sample.clone();
-        //
-        //     let (osc_id, env_id) = osc.lock().unwrap()[0].get();
-        //     info!("osc id => {osc_id}, env id => {env_id}");
-        //
-        //     let gen_env_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
-        //         let sample = *env_sample.lock().unwrap();
-        //         // info!("envelope filter is open: {}", sample >= 0.75);
-        //
-        //         sample
-        //     });
-        //
-        //     trace!("about to make envelope filter control thread");
-        //     let jh = Controller::spawn_admin_cmd(
-        //         gen_env_sample,
-        //         env_id as u8,
-        //         envelope::FILTER_OPEN_IN,
-        //         router.clone(),
-        //         connections.clone(),
-        //         self.modules.clone(),
-        //     );
-        //     handles.lock().unwrap().push(jh);
-        //
-        //     let gen_osc_sample: Box<dyn FnMut() -> Float + Send> = Box::new(move || {
-        //         // info!("about to send pitch");
-        //         let sample = *osc_sample.lock().unwrap();
-        //         // info!("setting vco pitch to {sample}");
-        //
-        //         sample
-        //     });
-        //
-        //     trace!("about to make oscilator control thread");
-        //     let jh = Controller::spawn_admin_cmd(
-        //         gen_osc_sample,
-        //         osc_id as u8,
-        //         vco::PITCH_INPUT,
-        //         router.clone(),
-        //         connections.clone(),
-        //         self.modules.clone(),
-        //     );
-        //     handles.lock().unwrap().push(jh);
-        //
-        //
-        //     // TODO: Maybe uneeded
-        //     let mut jh_s = self.consume_admin_syncs(&[osc_id, env_id]);
-        //     handles.lock().unwrap().append(&mut jh_s);
-        //     trace!("starting controller thread");
+
         let mut serial_buf: Vec<u8> = vec![0; 1000];
         let port = self.serial.clone();
-        // let osc_sample = Arc::new(Mutex::new(0.0));
-        // let env_sample = Arc::new(Mutex::new(0.0));
-        //
-        // let note = osc_sample.clone();
-        // let filter_open = env_sample.clone();
         let modules = self.modules.clone();
 
         spawn(async move {
@@ -283,36 +223,57 @@ impl Controller {
                     // println!("foobar");
                     // warn!("mod_type {} => {:?}", src, self.modules.indeces.get(src));
                     mods.into_iter()
-                        .for_each(|(output, sample)| src_samples[src][output as usize] = sample);
+                        .for_each(|(output, sample)| src_samples[src][output as usize] += sample);
                 } else {
                     break;
                 }
             }
 
             let mut dest_samples = [[0.0; 16]; u8::MAX as usize];
+            let mut destinations: Vec<(u8, u8)> = Vec::with_capacity(256);
 
             for con in self.connections.lock().unwrap().iter() {
                 dest_samples[con.dest_module as usize][con.dest_input as usize] +=
                     src_samples[con.src_module as usize][con.src_output as usize];
+
+                let dest = (con.dest_module, con.dest_input);
+
+                if !destinations.contains(&dest) {
+                    destinations.push(dest);
+                }
             }
 
-            for con in self.connections.lock().unwrap().iter() {
-                let sample = dest_samples[con.dest_module as usize][con.dest_input as usize];
+            for (dest_mod, dest_in) in destinations {
+                let sample = dest_samples[dest_mod as usize][dest_in as usize];
 
-                if con.dest_module == 0 {
+                if dest_mod == 0 {
                     self.output.recv_samples(0, &vec![sample]).await;
                 } else {
                     self.modules
                         .lock()
                         .unwrap()
-                        .send_sample_to(
-                            con.dest_module as usize,
-                            con.dest_input as usize,
-                            &vec![sample],
-                        )
+                        .send_sample_to(dest_mod as usize, dest_in as usize, &vec![sample])
                         .await;
                 }
             }
+
+            // for con in self.connections.lock().unwrap().iter() {
+            //     let sample = dest_samples[con.dest_module as usize][con.dest_input as usize];
+            //
+            //     if con.dest_module == 0 {
+            //         self.output.recv_samples(0, &vec![sample]).await;
+            //     } else {
+            //         self.modules
+            //             .lock()
+            //             .unwrap()
+            //             .send_sample_to(
+            //                 con.dest_module as usize,
+            //                 con.dest_input as usize,
+            //                 &vec![sample],
+            //             )
+            //             .await;
+            //     }
+            // }
         }
     }
 

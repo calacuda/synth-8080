@@ -1,5 +1,4 @@
 use super::Envelope;
-use tracing::info;
 
 pub struct Filter {}
 

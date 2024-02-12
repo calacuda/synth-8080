@@ -10,7 +10,7 @@ pub const DECAY_INPUT: u8 = 2;
 
 pub struct Buff {
     pub size: usize,
-    pub buff: [Float; SAMPLE_RATE as usize * 5],
+    pub buff: [Float; SAMPLE_RATE as usize],
     pub i: usize,
     pub step: usize,
     pub volume: Float,
@@ -18,15 +18,18 @@ pub struct Buff {
 
 impl Buff {
     pub fn get_sample(&mut self, input_sample: Float) -> Float {
-        let echo = ((self.buff[self.i] * self.volume) + input_sample) * 0.5;
+        let echo =
+            ((self.buff[(self.i + self.step) % self.size] * self.volume) + input_sample).tanh();
+        self.i = (self.i + 1) % self.size;
         self.buff[self.i] = echo;
-        self.i = (self.i + 1 + self.step) % self.size;
         echo
     }
 
     /// sets speed, takes speed in seconds
     pub fn set_speed(&mut self, speed: Float) {
+        info!("speed: {}", speed);
         self.step = (SAMPLE_RATE as Float * speed) as usize;
+        info!("step:  {}", self.step);
     }
 
     pub fn set_volume(&mut self, volume: Float) {
@@ -44,16 +47,19 @@ pub struct Echo {
 
 impl Echo {
     pub fn new(_id: u8) -> Self {
-        const BUFF_SIZE: usize = SAMPLE_RATE as usize * 5;
+        const BUFF_SIZE: usize = SAMPLE_RATE as usize;
 
-        let buff = Buff {
+        let mut buff = Buff {
             size: BUFF_SIZE,
             buff: [0.0; BUFF_SIZE],
             i: 0,
             step: 0,
-            volume: 1.0,
+            volume: 0.9,
         };
         let audio_in = 0.0;
+
+        // buff.set_speed(0.4);
+        buff.set_speed(0.4);
 
         Self {
             buff,
@@ -74,7 +80,7 @@ impl Module for Echo {
         if input_n == AUDIO_INPUT {
             self.audio_in = sample.tanh();
         } else if input_n == SPEED_INPUT {
-            self.buff.set_speed(sample.tanh());
+            self.buff.set_speed((sample.tanh() + 1.0) * 0.5);
         } else if input_n == DECAY_INPUT {
             self.buff.set_volume(sample.tanh());
         } else {

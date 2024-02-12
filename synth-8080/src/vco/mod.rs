@@ -33,7 +33,7 @@ pub struct Vco {
 impl Vco {
     pub fn new(id: u8) -> Self {
         let osc_type = OscType::Sine;
-        let mut osc = Oscilator::new();
+        let osc = Oscilator::new();
         let volume_in = 1.0;
         let pitch_in = 0.0;
         let overtones = false;
@@ -42,7 +42,7 @@ impl Vco {
 
         // DEBUG
         // osc.set_frequency(Note::A4.into());
-        // osc.lock().unwrap().set_overtones(true);
+        // osc.set_overtones(true);
         // osc.lock().unwrap().set_waveform(OscType::Triangle);
 
         Self {
@@ -61,21 +61,21 @@ impl Vco {
         if osc_type != self.osc_type {
             self.osc_type = osc_type;
             self.osc.set_waveform(osc_type);
-            info!("set to {osc_type:?}");
+            // info!("set to {osc_type:?}");
         }
     }
 
     pub fn set_overtones(&mut self, on: bool) {
         self.overtones = on;
 
-        info!("overtones on: {on}")
+        // info!("overtones on: {on}")
     }
 
     pub fn set_note(&mut self, note: Note) {
         self.note = note;
         self.osc.set_frequency(note.into());
 
-        info!("set note to {note}")
+        // info!("set note to {note}")
     }
 }
 

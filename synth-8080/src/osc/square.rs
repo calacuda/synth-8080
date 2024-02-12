@@ -1,6 +1,6 @@
 use super::Osc;
 use crate::Float;
-use fon::chan::{Ch32, Channel};
+use fon::chan::Channel;
 use twang::noise::White;
 use twang::ops::Gain;
 use twang::osc::Pulse;

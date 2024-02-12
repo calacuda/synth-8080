@@ -9,6 +9,7 @@ pub enum ModuleType {
     Lfo,
     Echo,
     EnvFilter,
+    Chorus,
 }
 
 pub struct ModuleInfo {
