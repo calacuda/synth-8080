@@ -10,6 +10,7 @@ pub enum ModuleType {
     Echo,
     EnvFilter,
     Chorus,
+    Delay,
 }
 
 pub struct ModuleInfo {

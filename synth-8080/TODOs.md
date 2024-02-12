@@ -9,7 +9,8 @@
     - [x] ADBDR
     - [x] ADSR
     - [ ] Audio In
-    - [ ] Chorus
+    - [x] Chorus (probably needs some fixing but its hard to tell with just a pure wave form and no knobs)
+    - [x] Delay (same as echo just a different implementation)
     - [x] Echo
     - [ ] Gain/Attenuator
     - [x] LFO
@@ -29,3 +30,4 @@
 10. [ ] add a "get state" http end point for the tauri app to query
 11. [ ] write tauri GUI front end
 12. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)
+13. [ ] write midi inputs

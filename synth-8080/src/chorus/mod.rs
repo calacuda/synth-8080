@@ -63,7 +63,7 @@ impl Chorus {
         };
         let audio_in = 0.0;
 
-        buff.set_speed(0.3);
+        buff.set_speed(0.65);
         // buff.set_speed(0.075);
 
         Self {

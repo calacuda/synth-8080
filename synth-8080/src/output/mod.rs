@@ -50,10 +50,11 @@ impl Source for Audio {
 }
 
 pub struct Output {
-    /// used for internal syncronization
+    /// used for internal syncronization with the audio buffer sent to rodio
     int_sync: Sender<Float>,
-    // recv: Receiver<Float>,
+    /// the current sample
     sample: Float,
+    /// the rodio output stream, it itsn't used but must never be dropped else audio ouput will cease
     _stream: OutputStream,
 }
 

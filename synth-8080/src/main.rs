@@ -12,8 +12,6 @@ pub type JoinHandle = tokio::task::JoinHandle<()>;
 pub use tokio::sync::mpsc::channel;
 // pub type channel = tokio::sync::
 
-// pub mod adbdr;
-// pub mod adsr;
 pub mod audio_in;
 pub mod chorus;
 pub mod common;
@@ -35,7 +33,7 @@ pub type Float = f64;
 pub const SAMPLE_RATE: u32 = 48_000;
 pub const FLOAT_LEN: usize = mem::size_of::<Float>();
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 30)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<()> {
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
@@ -59,7 +57,7 @@ async fn main() -> Result<()> {
         ModuleType::Lfo,
         ModuleType::Echo,
         ModuleType::Chorus,
-        ModuleType::Echo,
+        // ModuleType::Delay, same as echo
         ModuleType::Vco,
         ModuleType::Vco,
         ModuleType::Vco,
@@ -107,9 +105,7 @@ async fn main() -> Result<()> {
     // connect vco to output directly
     // ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
-    if let Err(e) = ctrlr.connect(1, 0, 2, envelope::AUDIO_IN) {
-        error!("{e}");
-    };
+    ctrlr.connect(1, 0, 2, envelope::AUDIO_IN)?;
     // connect adbdr to output
     // ctrlr.connect(2, 0, 0, 0)?;
     // connect adbdr to echo
@@ -117,9 +113,13 @@ async fn main() -> Result<()> {
     // connect echo to output
     ctrlr.connect(4, 0, 0, 0)?;
     // connect adbdr to chorus
-    ctrlr.connect(2, 0, 5, chorus::AUDIO_INPUT)?;
+    // ctrlr.connect(2, 0, 5, chorus::AUDIO_INPUT)?;
     // connect chorus to output
-    ctrlr.connect(5, 0, 0, 0)?;
+    // ctrlr.connect(5, 0, 0, 0)?;
+    // connect adbdr to delay
+    // ctrlr.connect(2, 0, 6, delay::AUDIO_INPUT)?;
+    // connect delay to output
+    // ctrlr.connect(6, 0, 0, 0)?;
 
     // info!("info => {}", ctrlr.module);
     let hardware_handle = ctrlr.start_harware();

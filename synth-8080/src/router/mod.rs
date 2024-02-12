@@ -17,7 +17,7 @@ pub struct Modules {
     // pub reverb: Vec<(Vec<Input>, Vec<Output>)>,
     // pub mid_pass: Vec<(Vec<Input>, Vec<Output>)>,
     // pub gain: Vec<(Vec<Input>, Vec<Output>)>,
-    // pub delay: Vec<(Vec<Input>, Vec<Output>)>,
+    pub delay: Vec<crate::delay::Delay>,
     pub chorus: Vec<crate::chorus::Chorus>,
     // pub audio_in: Vec<(Vec<Input>, Vec<Output>)>,
     /// allows for easier indexing into this struct. the index of the items in this Vec corespond
@@ -41,6 +41,7 @@ impl Modules {
             ModuleType::EnvFilter => self.filter[*i].get_samples().await,
             ModuleType::Echo => self.echo[*i].get_samples().await,
             ModuleType::Chorus => self.chorus[*i].get_samples().await,
+            ModuleType::Delay => self.delay[*i].get_samples().await,
             _ => {
                 error!("{mod_type:?} is not yet in Modules.get_output(...)'s match statement. pls fix that");
                 return None;
@@ -63,6 +64,7 @@ impl Modules {
             ModuleType::EnvFilter => self.filter[i].recv_samples(input as u8, samples).await,
             ModuleType::Echo => self.echo[i].recv_samples(input as u8, samples).await,
             ModuleType::Chorus => self.chorus[i].recv_samples(input as u8, samples).await,
+            ModuleType::Delay => self.delay[i].recv_samples(input as u8, samples).await,
             _ => {
                 error!("{mod_type:?} is not yet in Modules.get_output(...)'s match statement. pls fix that");
                 return;
@@ -101,6 +103,12 @@ impl From<&[ModuleType]> for Modules {
                     .push(crate::chorus::Chorus::new((s.indeces.len()) as u8));
                 s.indeces.push((*mod_type, s.chorus.len() - 1));
             }
+            ModuleType::Delay => {
+                s.delay
+                    .push(crate::delay::Delay::new((s.indeces.len()) as u8));
+                s.indeces.push((*mod_type, s.delay.len() - 1));
+            }
+
             _ => {
                 error!(
                     "{mod_type:?} is not yet in Modules.from(...)'s match statement. pls fix that"
