@@ -83,11 +83,11 @@ impl Output {
 }
 
 impl Module for Output {
-    async fn get_samples(&mut self) -> Vec<(u8, Float)> {
+    fn get_samples(&mut self) -> Vec<(u8, Float)> {
         vec![(0, self.sample)]
     }
 
-    async fn recv_samples(&mut self, _input_n: u8, samples: &[Float]) {
+    fn recv_samples(&mut self, _input_n: u8, samples: &[Float]) {
         let sample: Float = samples.iter().sum();
         self.sample = sample.tanh();
         // warn!("sample -> {sample}");

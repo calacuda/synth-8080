@@ -1,7 +1,6 @@
 use super::Envelope;
 use crate::{Float, SAMPLE_RATE};
 use anyhow::{bail, Result};
-use tracing::*;
 
 pub const ATTACK_IN: u8 = 3; // sets attack speed in seconds
 pub const DECAY_1_IN: u8 = 4; // sets decay 1 speed in seconds
@@ -56,7 +55,7 @@ impl Filter {
             attack_speed,
             decay_1_speed,
             decay_2_speed,
-            release: -1.0 / (sample_rate * 0.0001),
+            release: -1.0 / (sample_rate * 0.01),
             pressed: false,
             release_threshold: 0.05,
         }
@@ -138,11 +137,11 @@ impl Envelope for Filter {
         // info!("envelope filter is open: {}", sample >= 0.75);
 
         if self.pressed && sample <= 0.75 {
-            info!("release");
+            // info!("release");
             self.phase = Phase::Release;
             self.pressed = false;
         } else if !self.pressed && self.phase == Phase::Neutural && sample >= 0.75 {
-            info!("pressed");
+            // info!("pressed");
             self.phase = Phase::Attack;
             self.pressed = true;
         }
@@ -166,155 +165,3 @@ impl Envelope for Filter {
         Ok(())
     }
 }
-
-// #[derive(Debug, Clone)]
-// pub struct ADBDRModule {
-//     audio_in: Arc<Mutex<Float>>,
-//     envelope: Arc<Mutex<ADBDREnvelope>>,
-//     outputs: Arc<Mutex<Vec<Connection>>>,
-//     routing_table: Router,
-//     id: u8,
-// }
-//
-// impl ADBDRModule {
-//     pub fn new(routing_table: Router, id: u8) -> Self {
-//         Self {
-//             envelope: Arc::new(Mutex::new(ADBDREnvelope::new())),
-//             audio_in: Arc::new(Mutex::new(0.0)),
-//             outputs: Arc::new(Mutex::new(Vec::new())),
-//             routing_table,
-//             id,
-//         }
-//     }
-// }
-//
-// impl Module for ADBDRModule {
-//     fn start(&self) -> Result<JoinHandle<()>> {
-//         let router = self.routing_table.clone();
-//
-//         // audio output
-//         let outs = self.outputs.clone();
-//
-//         // inputs
-//         let env = self.envelope.clone();
-//         let env_2 = self.envelope.clone();
-//         let env_3 = self.envelope.clone();
-//         let env_4 = self.envelope.clone();
-//         let env_5 = self.envelope.clone();
-//         let env_6 = self.envelope.clone();
-//         let id = self.id as usize;
-//         let audio = self.audio_in.clone();
-//         let audio_2 = self.audio_in.clone();
-//
-//         Ok(spawn(async move {
-//             // prepare call back for event loop
-//             let ins: &Vec<ModuleIn> = (*router)
-//                 .0
-//                 .get(id)
-//                 .expect("this ADBDR Envelope Module was not found in the routing table struct.")
-//                 .as_ref();
-//             let gen_sample: Box<dyn FnMut() -> Float + Send> =
-//                 Box::new(move || (*audio.lock().unwrap()) * env.lock().unwrap().step());
-//             let outputs = vec![(outs, gen_sample)];
-//
-//             // get inputs and update values
-//             let set_atk: Box<dyn FnMut(Vec<Float>) + Send> =
-//                 Box::new(move |samples: Vec<Float>| {
-//                     let atk = samples.iter().sum::<Float>() / (samples.len() as Float);
-//                     let mut e = env_2.lock().unwrap();
-//                     (*e).set_attack(atk);
-//                 });
-//             let set_decay_1: Box<dyn FnMut(Vec<Float>) + Send> =
-//                 Box::new(move |samples: Vec<Float>| {
-//                     let decay = samples.iter().sum::<Float>() / (samples.len() as Float);
-//                     let mut e = env_3.lock().unwrap();
-//                     (*e).set_decay_1(decay);
-//                 });
-//             let set_decay_2: Box<dyn FnMut(Vec<Float>) + Send> =
-//                 Box::new(move |samples: Vec<Float>| {
-//                     let decay = samples.iter().sum::<Float>() / (samples.len() as Float);
-//                     let mut e = env_4.lock().unwrap();
-//                     (*e).set_decay_2(decay);
-//                 });
-//             let set_decay_threshold: Box<dyn FnMut(Vec<Float>) + Send> =
-//                 Box::new(move |samples: Vec<Float>| {
-//                     let threshold = samples.iter().sum::<Float>() / (samples.len() as Float);
-//                     let mut e = env_5.lock().unwrap();
-//                     (*e).threshold = threshold;
-//                 });
-//             let set_pressed: Box<dyn FnMut(Vec<Float>) + Send> =
-//                 Box::new(move |samples: Vec<Float>| {
-//                     let in_val = samples.iter().sum::<Float>() / (samples.len() as Float);
-//                     let mut e = env_6.lock().unwrap();
-//
-//                     // info!("set_pressed => in_val {in_val}, phase => {:?}", e.phase);
-//                     if e.pressed && in_val <= 0.75 {
-//                         // info!("release");
-//                         (*e).phase = Phase::Release;
-//                         (*e).pressed = false;
-//                     } else if !e.pressed && e.phase == Phase::Neutural && in_val >= 0.75 {
-//                         // info!("pressed");
-//                         (*e).phase = Phase::Attack;
-//                         (*e).pressed = true;
-//                     }
-//                 });
-//             let set_audio: Box<dyn FnMut(Vec<Float>) + Send> =
-//                 Box::new(move |samples: Vec<Float>| {
-//                     let audio = samples.iter().sum::<Float>().tanh();
-//                     let mut a = audio_2.lock().unwrap();
-//                     (*a) = audio;
-//                 });
-//
-//             let inputs = vec![
-//                 (&ins[AUDIO_IN as usize], set_audio),
-//                 (&ins[ENVELOPE_IN as usize], set_pressed),
-//                 (&ins[ATTACK_IN as usize], set_atk),
-//                 (&ins[DECAY_1_IN as usize], set_decay_1),
-//                 (&ins[DECAY_THRESHOLD as usize], set_decay_threshold),
-//                 (&ins[DECAY_2_IN as usize], set_decay_2),
-//             ];
-//
-//             // start the event loop
-//             event_loop(router.clone(), inputs, outputs).await;
-//         }))
-//     }
-//
-//     fn connect(&self, connection: Connection) -> Result<()> {
-//         ensure!(
-//             connection.src_output < N_OUTPUTS,
-//             "invalid output selection"
-//         );
-//         ensure!(
-//             !self.outputs.lock().unwrap().contains(&connection),
-//             "module already connected"
-//         );
-//         self.outputs.lock().unwrap().push(connection);
-//
-//         // info!(
-//         //     "connected output: {}, of module: {}, to input: {}, of module: {}",
-//         //     connection.src_output,
-//         //     connection.src_module,
-//         //     connection.dest_input,
-//         //     connection.dest_module
-//         // );
-//
-//         Ok(())
-//     }
-//
-//     fn disconnect(&self, connection: Connection) -> Result<()> {
-//         ensure!(
-//             connection.src_output < N_OUTPUTS,
-//             "invalid output selection"
-//         );
-//         ensure!(
-//             self.outputs.lock().unwrap().contains(&connection),
-//             "module not connected"
-//         );
-//         self.outputs
-//             .lock()
-//             .unwrap()
-//             .retain(|out| *out != connection);
-//
-//         Ok(())
-//     }
-// }

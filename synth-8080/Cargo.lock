@@ -888,6 +888,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
+name = "reverb"
+version = "1.0.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd3b8aaccb0168a5e793c8727141ab9a084f0487d40080a8bee93652dd5375ea"
+
+[[package]]
 name = "rodio"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1076,6 +1082,7 @@ dependencies = [
  "crossbeam-channel",
  "fon",
  "futures",
+ "reverb",
  "rodio",
  "serde",
  "serialport",

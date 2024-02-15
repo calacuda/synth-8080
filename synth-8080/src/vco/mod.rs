@@ -42,8 +42,7 @@ impl Vco {
 
         // DEBUG
         // osc.set_frequency(Note::A4.into());
-        // osc.set_overtones(true);
-        // osc.lock().unwrap().set_waveform(OscType::Triangle);
+        // osc.set_waveform(OscType::Triangle);
 
         Self {
             osc_type,
@@ -80,13 +79,13 @@ impl Vco {
 }
 
 impl Module for Vco {
-    async fn get_samples(&mut self) -> Vec<(u8, Float)> {
+    fn get_samples(&mut self) -> Vec<(u8, Float)> {
         let sample = self.osc.get_sample() * self.volume_in;
         // info!("sample {sample}");
         vec![(0, sample)]
     }
 
-    async fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
+    fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
         if input_n == PITCH_INPUT {
             self.osc.set_frequency(samples[0]);
         } else if input_n == VOLUME_INPUT {

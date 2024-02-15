@@ -21,7 +21,7 @@ impl Buff {
         let chorus = ((self.buff[self.i] * self.volume) + input_sample).tanh();
         // self.buff[self.i ] = echo;
         self.buff[(self.i + self.step) % self.size] = chorus;
-        self.buff[self.i] = 0.0;
+        // self.buff[self.i] = 0.0;
         // self.buff[(self.i as i64 - self.step as i64).abs() as usize % self.size] = echo;
         self.i = (self.i + 1) % self.size;
         // if echo == input_sample && input_sample != 0.0 {
@@ -32,9 +32,9 @@ impl Buff {
 
     /// sets speed, takes speehttp://localhost/d in seconds
     pub fn set_speed(&mut self, speed: Float) {
-        info!("speed: {}", speed);
-        self.step = (SAMPLE_RATE as Float * (speed * 0.09)) as usize;
-        info!("step:  {}", self.step);
+        // info!("speed: {}", speed);
+        self.step = (SAMPLE_RATE as Float * (speed * 0.05)) as usize;
+        // info!("step:  {}", self.step);
     }
 
     pub fn set_volume(&mut self, volume: Float) {
@@ -63,8 +63,8 @@ impl Chorus {
         };
         let audio_in = 0.0;
 
-        buff.set_speed(0.65);
-        // buff.set_speed(0.075);
+        // buff.set_speed(0.0);
+        buff.set_speed(0.075);
 
         Self {
             buff,
@@ -75,12 +75,12 @@ impl Chorus {
 }
 
 impl Module for Chorus {
-    async fn get_samples(&mut self) -> Vec<(u8, Float)> {
+    fn get_samples(&mut self) -> Vec<(u8, Float)> {
         // info!("chorus");
         vec![(0, self.buff.get_sample(self.audio_in))]
     }
 
-    async fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
+    fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
         let sample: Float = samples.iter().sum();
 
         if input_n == AUDIO_INPUT {

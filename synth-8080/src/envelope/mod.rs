@@ -99,10 +99,8 @@ pub struct EnvelopeFilter {
 impl EnvelopeFilter {
     pub fn new(id: u8) -> Self {
         Self {
-            // routing_table,
             filter_type: FilterType::None,
             outputs: Arc::new(Mutex::new(Vec::new())),
-            // generator: Arc::new(Mutex::new(spawn(async {}))),
             envelope: Box::new(adbdr::Filter::new()),
             audio_in: 0.0,
             id,
@@ -111,11 +109,11 @@ impl EnvelopeFilter {
 }
 
 impl Module for EnvelopeFilter {
-    async fn get_samples(&mut self) -> Vec<(u8, Float)> {
+    fn get_samples(&mut self) -> Vec<(u8, Float)> {
         vec![(0, self.audio_in * self.envelope.step())]
     }
 
-    async fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
+    fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
         if input_n == FILTER_SELECT_IN {
             // self.filter_select_in_cons.lock().unwrap().push(connection);
             let input = samples.iter().sum::<Float>().tanh();

@@ -54,14 +54,14 @@ impl Lfo {
 }
 
 impl Module for Lfo {
-    async fn get_samples(&mut self) -> Vec<(u8, Float)> {
+    fn get_samples(&mut self) -> Vec<(u8, Float)> {
         let sample = self.osc.get_sample() * self.volume_in;
         // info!("lfo => {sample}");
 
         vec![(0, sample)]
     }
 
-    async fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
+    fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
         if input_n == PITCH_IN {
             self.osc.set_frequency(samples[0]);
         } else if input_n == VOL_IN {

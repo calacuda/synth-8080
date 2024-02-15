@@ -11,6 +11,8 @@ pub enum ModuleType {
     EnvFilter,
     Chorus,
     Delay,
+    OverDrive,
+    Reverb,
 }
 
 pub struct ModuleInfo {
@@ -29,10 +31,10 @@ pub struct Connection {
 
 pub trait Module {
     /// handles recieving a sample on a designated input
-    async fn recv_samples(&mut self, input_n: u8, samples: &[Float]);
+    fn recv_samples(&mut self, input_n: u8, samples: &[Float]);
 
     /// produces a sample from all outputs
-    async fn get_samples(&mut self) -> Vec<(u8, Float)>;
+    fn get_samples(&mut self) -> Vec<(u8, Float)>;
 }
 
 pub fn bend_range() -> Float {

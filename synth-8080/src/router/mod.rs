@@ -14,11 +14,12 @@ pub struct Modules {
     pub vco: Vec<crate::vco::Vco>,
     /// a list of evnvelope filters
     pub filter: Vec<crate::envelope::EnvelopeFilter>,
-    // pub reverb: Vec<(Vec<Input>, Vec<Output>)>,
+    pub reverb: Vec<crate::reverb::ReverbModule>,
     // pub mid_pass: Vec<(Vec<Input>, Vec<Output>)>,
     // pub gain: Vec<(Vec<Input>, Vec<Output>)>,
     pub delay: Vec<crate::delay::Delay>,
     pub chorus: Vec<crate::chorus::Chorus>,
+    pub over_drive: Vec<crate::overdrive::OverDrive>,
     // pub audio_in: Vec<(Vec<Input>, Vec<Output>)>,
     /// allows for easier indexing into this struct. the index of the items in this Vec corespond
     /// to the modules ID
@@ -26,7 +27,7 @@ pub struct Modules {
 }
 
 impl Modules {
-    pub async fn get_output(&mut self, id: usize) -> Option<Vec<(u8, Float)>> {
+    pub fn get_output(&mut self, id: usize) -> Option<Vec<(u8, Float)>> {
         if id == 0 {
             return Some(Vec::new());
         }
@@ -36,12 +37,14 @@ impl Modules {
         // info!("n vcos {}", self.vco.len());
 
         Some(match mod_type {
-            ModuleType::Vco => self.vco[*i].get_samples().await,
-            ModuleType::Lfo => self.lfo[*i].get_samples().await,
-            ModuleType::EnvFilter => self.filter[*i].get_samples().await,
-            ModuleType::Echo => self.echo[*i].get_samples().await,
-            ModuleType::Chorus => self.chorus[*i].get_samples().await,
-            ModuleType::Delay => self.delay[*i].get_samples().await,
+            ModuleType::Vco => self.vco[*i].get_samples(),
+            ModuleType::Lfo => self.lfo[*i].get_samples(),
+            ModuleType::EnvFilter => self.filter[*i].get_samples(),
+            ModuleType::Echo => self.echo[*i].get_samples(),
+            ModuleType::Chorus => self.chorus[*i].get_samples(),
+            ModuleType::Delay => self.delay[*i].get_samples(),
+            ModuleType::OverDrive => self.over_drive[*i].get_samples(),
+            ModuleType::Reverb => self.reverb[*i].get_samples(),
             _ => {
                 error!("{mod_type:?} is not yet in Modules.get_output(...)'s match statement. pls fix that");
                 return None;
@@ -49,7 +52,7 @@ impl Modules {
         })
     }
 
-    pub async fn send_sample_to(&mut self, id: usize, input: usize, samples: &[Float]) {
+    pub fn send_sample_to(&mut self, id: usize, input: usize, samples: &[Float]) {
         if id == 0 {
             warn!("break");
             // self.output.recv_samples(0, samples);
@@ -59,12 +62,14 @@ impl Modules {
         let (mod_type, i) = self.indeces[id - 1];
 
         match mod_type {
-            ModuleType::Vco => self.vco[i].recv_samples(input as u8, samples).await,
-            ModuleType::Lfo => self.lfo[i].recv_samples(input as u8, samples).await,
-            ModuleType::EnvFilter => self.filter[i].recv_samples(input as u8, samples).await,
-            ModuleType::Echo => self.echo[i].recv_samples(input as u8, samples).await,
-            ModuleType::Chorus => self.chorus[i].recv_samples(input as u8, samples).await,
-            ModuleType::Delay => self.delay[i].recv_samples(input as u8, samples).await,
+            ModuleType::Vco => self.vco[i].recv_samples(input as u8, samples),
+            ModuleType::Lfo => self.lfo[i].recv_samples(input as u8, samples),
+            ModuleType::EnvFilter => self.filter[i].recv_samples(input as u8, samples),
+            ModuleType::Echo => self.echo[i].recv_samples(input as u8, samples),
+            ModuleType::Chorus => self.chorus[i].recv_samples(input as u8, samples),
+            ModuleType::Delay => self.delay[i].recv_samples(input as u8, samples),
+            ModuleType::OverDrive => self.over_drive[i].recv_samples(input as u8, samples),
+            ModuleType::Reverb => self.reverb[i].recv_samples(input as u8, samples),
             _ => {
                 error!("{mod_type:?} is not yet in Modules.get_output(...)'s match statement. pls fix that");
                 return;
@@ -108,7 +113,14 @@ impl From<&[ModuleType]> for Modules {
                     .push(crate::delay::Delay::new((s.indeces.len()) as u8));
                 s.indeces.push((*mod_type, s.delay.len() - 1));
             }
-
+            ModuleType::OverDrive => {
+                s.over_drive.push(crate::overdrive::OverDrive::new());
+                s.indeces.push((*mod_type, s.over_drive.len() - 1));
+            }
+            ModuleType::Reverb => {
+                s.reverb.push(crate::reverb::ReverbModule::new());
+                s.indeces.push((*mod_type, s.reverb.len() - 1));
+            }
             _ => {
                 error!(
                     "{mod_type:?} is not yet in Modules.from(...)'s match statement. pls fix that"

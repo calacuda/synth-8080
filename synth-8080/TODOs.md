@@ -12,12 +12,13 @@
     - [x] Chorus (probably needs some fixing but its hard to tell with just a pure wave form and no knobs)
     - [x] Delay (same as echo just a different implementation)
     - [x] Echo
-    - [ ] Gain/Attenuator
+    - [ ] Attenuator
     - [x] LFO
     - [ ] Mid-Pass
     - [x] Output
-    - [ ] Reverb
+    - [x] Reverb
     - [x] VCO
+    - [x] overdrive
 6. [x] write alternate oscilators
     - [x] sine
     - [x] square
@@ -30,4 +31,5 @@
 10. [ ] add a "get state" http end point for the tauri app to query
 11. [ ] write tauri GUI front end
 12. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)
-13. [ ] write midi inputs
+13. [ ] build the housing
+14. [ ] write midi inputs

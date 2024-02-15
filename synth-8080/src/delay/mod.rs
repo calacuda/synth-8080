@@ -32,9 +32,7 @@ impl Buff {
 
     /// sets speed, takes speehttp://localhost/d in seconds
     pub fn set_speed(&mut self, speed: Float) {
-        info!("speed: {}", speed);
         self.step = (SAMPLE_RATE as Float * speed) as usize;
-        info!("step:  {}", self.step);
     }
 
     pub fn set_volume(&mut self, volume: Float) {
@@ -75,12 +73,12 @@ impl Delay {
 }
 
 impl Module for Delay {
-    async fn get_samples(&mut self) -> Vec<(u8, Float)> {
+    fn get_samples(&mut self) -> Vec<(u8, Float)> {
         // info!("chorus");
         vec![(0, self.buff.get_sample(self.audio_in))]
     }
 
-    async fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
+    fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
         let sample: Float = samples.iter().sum();
 
         if input_n == AUDIO_INPUT {

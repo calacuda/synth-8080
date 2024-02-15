@@ -22,8 +22,6 @@ pub trait Osc: Send {
     fn get_sample(&mut self) -> Float;
 
     fn set_frequency(&mut self, frequency: Float);
-
-    fn set_overtones(&mut self, on: bool);
 }
 
 pub struct Oscilator {
@@ -86,12 +84,6 @@ impl Oscilator {
         };
 
         self.osc.set_frequency(self.frequency);
-        self.osc.set_overtones(self.overtones);
-    }
-
-    pub fn set_overtones(&mut self, overtones: bool) {
-        self.overtones = overtones;
-        self.osc.set_overtones(overtones);
     }
 
     /// applies a pitch bend by changing the oscilators frequency
