@@ -65,7 +65,7 @@ impl Module for Lfo {
         if input_n == PITCH_IN {
             self.osc.set_frequency(samples[0]);
         } else if input_n == VOL_IN {
-            self.volume_in = samples.iter().sum::<Float>().tanh();
+            self.volume_in = (samples.iter().sum::<Float>().tanh() + 1.0) * 0.5;
         } else if input_n == OSC_TYPE_IN {
             error!("can not yet set LFO oscilator type");
         } else {

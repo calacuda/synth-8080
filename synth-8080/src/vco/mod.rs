@@ -89,7 +89,7 @@ impl Module for Vco {
         if input_n == PITCH_INPUT {
             self.osc.set_frequency(samples[0]);
         } else if input_n == VOLUME_INPUT {
-            self.volume_in = samples.iter().sum::<Float>().tanh();
+            self.volume_in = (samples.iter().sum::<Float>().tanh() + 1.0) * 0.5;
         } else if input_n == PITCH_BEND_INPUT {
             self.osc.apply_bend(samples.iter().sum::<Float>().tanh());
         } else {

@@ -44,18 +44,18 @@ pub trait Envelope: Send {
     /// the input doesn't exist for the current filter
     fn take_input(&mut self, input: u8, samples: Vec<Float>) -> Result<()>;
 
-    fn open_filter(&mut self, samples: Vec<Float>);
+    /// opens or closses the filter depending on the sum of `samples`. returns wether the filter is
+    /// pressed.
+    fn open_filter(&mut self, samples: Vec<Float>) -> bool;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum FilterType {
     None,
     ADBDR,
     ADSR,
     OC,
-    // TODO: Write AD filter
-
-    // AD,
+    AD,
 }
 
 impl Into<Float> for FilterType {
@@ -65,6 +65,7 @@ impl Into<Float> for FilterType {
             Self::ADBDR => 2.0,
             Self::ADSR => 3.0,
             Self::OC => 4.0,
+            Self::AD => 5.0,
         }
     }
 }
@@ -76,6 +77,7 @@ impl From<Float> for FilterType {
             2.0..3.0 => Self::ADBDR,
             3.0..4.0 => Self::ADSR,
             4.0..5.0 => Self::OC,
+            5.0..6.0 => Self::AD,
             _ => Self::None,
         }
     }
@@ -84,8 +86,8 @@ impl From<Float> for FilterType {
 pub struct EnvelopeFilter {
     /// which filter is currently in use
     pub filter_type: FilterType,
-    // /// where to send the audio that gets generated
-    // pub outputs: Arc<Mutex<Vec<Connection>>>,
+    /// stores if the envelope is pressed
+    pub pressed: bool,
     /// the filter that is currently in use
     pub envelope: Box<dyn Envelope>,
     /// stores the audio input sample
@@ -98,11 +100,23 @@ impl EnvelopeFilter {
     pub fn new(id: u8) -> Self {
         Self {
             filter_type: FilterType::None,
-            // outputs: Arc::new(Mutex::new(Vec::new())),
-            envelope: Box::new(adbdr::Filter::new()),
+            pressed: false,
+            envelope: Box::new(ad::Filter::new()),
             audio_in: 0.0,
             id,
         }
+    }
+
+    pub fn set_filter_type(&mut self, filter_type: FilterType) {
+        self.filter_type = filter_type;
+        info!("setting filter type to {:?}", self.filter_type);
+        self.envelope = match self.filter_type {
+            FilterType::None => Box::new(none::Filter::new()),
+            FilterType::ADSR => Box::new(adsr::Filter::new()),
+            FilterType::ADBDR => Box::new(adbdr::Filter::new()),
+            FilterType::OC => Box::new(oc::Filter::new()),
+            FilterType::AD => Box::new(ad::Filter::new()),
+        };
     }
 }
 
@@ -117,20 +131,14 @@ impl Module for EnvelopeFilter {
             let input = samples.iter().sum::<Float>().tanh();
             if input > 1.0 {
                 // let mut ft = ft.lock().unwrap();
-                self.filter_type = input.into();
-                info!("setting filter type to {:?}", self.filter_type);
-                self.envelope = match self.filter_type {
-                    FilterType::None => Box::new(none::Filter::new()),
-                    FilterType::ADSR => Box::new(adsr::Filter::new()),
-                    FilterType::ADBDR => Box::new(adbdr::Filter::new()),
-                    FilterType::OC => Box::new(oc::Filter::new()),
-                };
+                self.set_filter_type(input.into());
             }
         } else if input_n == AUDIO_IN {
             let audio = samples.iter().sum::<Float>().tanh();
             self.audio_in = audio
         } else if input_n == FILTER_OPEN_IN {
-            self.envelope.open_filter(samples.to_vec())
+            // let input: Float = samples.iter().sum();
+            self.pressed = self.envelope.open_filter(samples.to_vec());
         } else if input_n == 3 {
             let _ = self.envelope.take_input(0, samples.to_vec());
         } else if input_n == 4 {

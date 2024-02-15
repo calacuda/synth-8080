@@ -8,14 +8,14 @@
 5. [ ] write other modules
     - [x] ADBDR
     - [x] ADSR
-    - [ ] AD
-    - [ ] Audio In
+    - [x] AD
+    - [ ] Audio In 
     - [x] Chorus (probably needs some fixing but its hard to tell with just a pure wave form and no knobs)
     - [x] Delay (same as echo just a different implementation)
     - [x] Echo
     - [ ] Attenuator
     - [x] LFO
-    - [ ] Mid-Pass
+    <!-- - [ ] Mid-Pass -->
     - [x] Output
     - [x] Reverb
     - [x] VCO
@@ -29,8 +29,12 @@
 7. [x] add tanh to all inputs that except mutiple signals.
 8. [x] finish controller
 9. [ ] write the code for the micro-controller to read the controlles
-10. [ ] add a "get state" http end point for the tauri app to query
-11. [ ] write tauri GUI front end
-12. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)
-13. [ ] build the housing
-14. [ ] write midi inputs
+10. [ ] add audio input
+11. [ ] add a "get state" http end point for the tauri app to query
+    - NOTE: use unix socket instead, will be more reasorce efficient
+12. [ ] write tauri GUI front end
+13. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)
+14. [ ] build the housing
+15. [ ] write midi inputs
+    - [ ] write async input controller
+    - [ ] test with raspberry-pi pico || arduino pro-micro (at least one of them should be able to send midi input)

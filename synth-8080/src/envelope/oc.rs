@@ -28,7 +28,8 @@ impl Envelope for Filter {
         Ok(())
     }
 
-    fn open_filter(&mut self, samples: Vec<crate::Float>) {
+    fn open_filter(&mut self, samples: Vec<crate::Float>) -> bool {
         self.open = samples.iter().sum::<Float>().tanh() >= 0.75;
+        self.open
     }
 }

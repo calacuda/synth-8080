@@ -5,9 +5,9 @@ use anyhow::{bail, Result};
 pub const N_INPUTS: u8 = 5;
 pub const N_OUTPUTS: u8 = 1;
 
-pub const ATTACK_IN: u8 = 0; // sets attack speed in seconds
-pub const DECAY_IN: u8 = 1; // sets decay 1 speed in seconds
-pub const DECAY_THRESHOLD: u8 = 2; // sets the threshold between decay 1 & 2 in amplitude
+pub const ATTACK_IN: u8 = 3; // sets attack speed in seconds
+pub const DECAY_IN: u8 = 4; // sets decay 1 speed in seconds
+pub const DECAY_THRESHOLD: u8 = 5; // sets the threshold between decay 1 & 2 in amplitude
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum Phase {
@@ -20,9 +20,7 @@ enum Phase {
 
 #[derive(Debug, Clone)]
 pub struct Filter {
-    // pressed: bool,
     phase: Phase,
-    // i: usize,
     env: Float,
     pub decay_speed: Float,
     pub attack_speed: Float,
@@ -120,7 +118,7 @@ impl Envelope for Filter {
         self.internal_update_phase()
     }
 
-    fn open_filter(&mut self, samples: Vec<Float>) {
+    fn open_filter(&mut self, samples: Vec<Float>) -> bool {
         let sample: Float = samples.iter().sum::<Float>().tanh();
 
         if self.pressed && sample <= 0.75 {
@@ -132,6 +130,8 @@ impl Envelope for Filter {
             self.phase = Phase::Attack;
             self.pressed = true;
         }
+
+        self.pressed
     }
 
     fn take_input(&mut self, input: u8, samples: Vec<Float>) -> Result<()> {
@@ -144,7 +144,7 @@ impl Envelope for Filter {
             1 => self.set_decay(sample),
             // decay_threshold in
             2 => self.set_threshold(sample),
-            n => bail!("{n} is not a valid input for the ADBDR filter."),
+            n => bail!("{n} is not a valid input for the ADSR filter."),
         }
 
         Ok(())

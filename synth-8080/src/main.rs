@@ -1,4 +1,4 @@
-#![feature(exclusive_range_pattern)]
+#![feature(exclusive_range_pattern, let_chains)]
 use anyhow::{bail, Result};
 use common::Module;
 use common::ModuleType;
@@ -157,10 +157,12 @@ async fn main() -> Result<()> {
     // ctrlr.connect(1, 0, 0, 0)?;
     // // connect LFO to VCO volume input
     // ctrlr.connect(3, 0, 1, vco::VOLUME_INPUT)?;
-    // // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+    ctrlr.modules.lock().unwrap().lfo[0].volume_in = 0.7;
+    ctrlr.modules.lock().unwrap().lfo[0].set_pitch(1.0);
+    ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
     // sleep(Duration::from_secs_f64(1.0)).await;
     // ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
-    // // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+    // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
     // sleep(Duration::from_secs_f64(2.0)).await;
     // info!("disconnecting trem");
     // ctrlr.disconnect(2, 0, 1, vco::VOLUME_INPUT)?;
@@ -178,9 +180,9 @@ async fn main() -> Result<()> {
     // connect echo to output
     // ctrlr.connect(4, 0, 0, 0)?;
     // connect adbdr to chorus
-    // ctrlr.connect(2, 0, 5, chorus::AUDIO_INPUT)?;
+    ctrlr.connect(2, 0, 5, chorus::AUDIO_INPUT)?;
     // connect chorus to output
-    // ctrlr.connect(5, 0, 0, 0)?;
+    ctrlr.connect(5, 0, 0, 0)?;
     // connect adbdr to delay
     // ctrlr.connect(2, 0, 6, delay::AUDIO_INPUT)?;
     // connect delay to output
@@ -192,9 +194,9 @@ async fn main() -> Result<()> {
     // connect LFO to overdrive gain input
     // ctrlr.connect(3, 0, 7, overdrive::GAIN_INPUT)?;
     // connect chorus to reverb
-    ctrlr.connect(2, 0, 8, reverb::AUDIO_INPUT)?;
+    // ctrlr.connect(2, 0, 8, reverb::AUDIO_INPUT)?;
     // connect reverb to output
-    ctrlr.connect(8, 0, 0, 0)?;
+    // ctrlr.connect(8, 0, 0, 0)?;
 
     let audio = AudioGen {
         controller: ctrlr.clone(),

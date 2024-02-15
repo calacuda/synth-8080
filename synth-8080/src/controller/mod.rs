@@ -1,5 +1,6 @@
 use crate::{
     common::{notes::Note, Connection, ModuleType},
+    envelope::FilterType,
     output,
     router::Modules,
     JoinHandle,
@@ -43,29 +44,33 @@ impl Controller {
 
     pub fn play(&self, note: Note) {
         let mut playing = self.playing.lock().unwrap();
+        let mut mods = self.modules.lock().unwrap();
 
-        if playing
-            .iter()
-            .filter(|(_, n)| *n == note)
-            .peekable()
-            .peek()
-            .is_none()
+        if let Some(i) =
+            mods.filter.iter_mut().enumerate().find_map(
+                |(i, f)| {
+                    if !f.pressed {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                },
+            )
+            && playing
+                .iter()
+                .filter(|(_, n)| *n == note)
+                .peekable()
+                .peek()
+                .is_none()
         {
-            let mut mods = self.modules.lock().unwrap();
-
-            if let Some(i) = mods.vco.iter_mut().enumerate().find_map(|(i, f)| {
-                if f.osc.frequency == 0.0 {
-                    Some(i)
-                } else {
-                    None
-                }
-            }) {
-                mods.vco[i].set_note(note);
-                playing.push((i, note));
-                mods.filter[i].envelope.open_filter(vec![1.0]);
-            } else {
-                error!("already playing notes");
-            }
+            // if
+            // {
+            mods.vco[i].set_note(note);
+            playing.push((i, note));
+            mods.filter[i].envelope.open_filter(vec![1.0]);
+            // } else {
+            //     error!("already playing notes");
+            // }
         } else {
             error!("note {note} is already being played");
         }
@@ -91,7 +96,7 @@ impl Controller {
                     None
                 }
             }) {
-                mods.vco[i].osc.set_frequency(0.0);
+                // mods.vco[i].osc.set_frequency(0.0);
                 mods.filter[i].envelope.open_filter(vec![0.0]);
             } else {
                 error!("already playing notes");
@@ -101,6 +106,14 @@ impl Controller {
         }
 
         self.playing.lock().unwrap().retain(|(_, n)| *n != note);
+    }
+
+    /// sets filter type for all filters associated with a VCO
+    pub fn set_filter_type(&self, filter_type: FilterType) {
+        let mut mods = self.modules.lock().unwrap();
+        let n_vcos = mods.vco.len();
+
+        (0..n_vcos).for_each(|i| mods.filter[i].set_filter_type(filter_type));
     }
 
     /// connects src module to dest module

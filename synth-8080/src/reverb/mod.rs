@@ -20,7 +20,7 @@ impl ReverbModule {
         ReverbModule {
             verb: Reverb::new()
                 .diffusion(0.75, 0.75, 0.75, 0.75)
-                .decay(0.5)
+                .decay(0.9)
                 .clone(),
             audio_in: 0.0,
             gain: 1.0,

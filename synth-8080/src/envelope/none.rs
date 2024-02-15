@@ -1,4 +1,5 @@
 use super::Envelope;
+use crate::Float;
 
 pub struct Filter {}
 
@@ -25,5 +26,9 @@ impl Envelope for Filter {
         Ok(())
     }
 
-    fn open_filter(&mut self, _samples: Vec<crate::Float>) {}
+    fn open_filter(&mut self, samples: Vec<crate::Float>) -> bool {
+        let input = samples.iter().sum::<Float>();
+
+        input >= 0.75
+    }
 }
