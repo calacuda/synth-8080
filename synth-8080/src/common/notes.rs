@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::convert::Into;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, Clone, Deserialize, Copy)]
+#[derive(Debug, Clone, Deserialize, Copy, PartialEq, Eq)]
 pub enum Note {
     #[serde(alias = "c0", alias = "C0")]
     C0,

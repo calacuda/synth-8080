@@ -8,6 +8,7 @@
 5. [ ] write other modules
     - [x] ADBDR
     - [x] ADSR
+    - [ ] AD
     - [ ] Audio In
     - [x] Chorus (probably needs some fixing but its hard to tell with just a pure wave form and no knobs)
     - [x] Delay (same as echo just a different implementation)
@@ -26,7 +27,7 @@
     - [x] saw-tooth
     - [x] overtones oscilator
 7. [x] add tanh to all inputs that except mutiple signals.
-8. [ ] finish controller
+8. [x] finish controller
 9. [ ] write the code for the micro-controller to read the controlles
 10. [ ] add a "get state" http end point for the tauri app to query
 11. [ ] write tauri GUI front end

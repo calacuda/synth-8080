@@ -4,47 +4,12 @@ use crate::{
     router::Modules,
     JoinHandle,
 };
-use anyhow::{ensure, Result};
+use anyhow::ensure;
 use crossbeam_channel::{unbounded, Receiver};
 use std::sync::Mutex;
 use tracing::*;
 
 pub mod harware;
-
-#[derive(Clone, Copy, Debug)]
-pub struct OscilatorId {
-    /// the index of the VCO which will synthesis the note,
-    pub vco: usize,
-    /// the index of the coresponding filter (i.e the filter coreesponding to `self.vco`)
-    pub env: usize,
-}
-
-impl OscilatorId {
-    pub fn new_s(mod_types: &[ModuleType]) -> Result<Vec<Self>> {
-        let mut vco_i_s = Vec::new();
-        let mut filter_i_s = Vec::new();
-
-        mod_types
-            .iter()
-            .enumerate()
-            .for_each(|(i, mod_t)| match mod_t {
-                ModuleType::Vco => vco_i_s.push(i),
-                ModuleType::EnvFilter => filter_i_s.push(i),
-                _ => {}
-            });
-
-        Ok(vco_i_s
-            .into_iter()
-            .zip(filter_i_s.into_iter())
-            .map(|(vco, env)| Self { vco, env })
-            .collect())
-    }
-
-    /// returns (vco_id, env_id)
-    pub fn get(&self) -> (usize, usize) {
-        (self.vco, self.env)
-    }
-}
 
 pub struct Controller {
     /// the liist of connections
@@ -52,23 +17,10 @@ pub struct Controller {
     pub modules: Mutex<Modules>,
     pub output: Mutex<output::Output>,
     pub sync: Receiver<()>,
-    // src_s: HashSet<usize>,
-    // dest_s: HashSet<usize>,
-
-    // /// the list of registered modules
-    // pub modules: Arc<Mutex<Vec<(ModuleInfo, Box<dyn Module>)>>>,
-    // /// a table representing all inputs of all modules
-    // pub routing_table: Router,
-    // /// a list of join handles for the event loops of all modules
-    // pub handles: Arc<Mutex<Vec<JoinHandle>>>,
-    // /// list of the locations of the oscilators and coresponding envelope filters
-    // pub oscilators: Arc<Mutex<Vec<OscilatorId>>>,
-    // /// UART connection to the micro-controller
-    // pub serial: Arc<Mutex<Box<dyn SerialPort>>>,
-    // pub output: Arc<Output>,
     // TODO: find lib to talk to MIDI device
     // /// Connection to MIDI device
     // pub midi: Arc<Mutex<>>,
+    pub playing: Mutex<Vec<(usize, Note)>>,
 }
 
 impl Controller {
@@ -83,60 +35,73 @@ impl Controller {
                 modules,
                 sync,
                 output: Mutex::new(output),
+                playing: Mutex::new(Vec::new()),
             },
             jh,
         ))
     }
 
-    // pub fn step(&mut self) {
-    //     // loop {
-    //     // warn!("foobar");
-    //     if let Err(e) = self.sync.recv() {
-    //         error!("error recieving sync message: {e}");
-    //     };
-    //
-    //     let mut src_samples = [[0.0; 16]; u8::MAX as usize];
-    //
-    //     for src in 0..u8::MAX as usize {
-    //         if let Some(mods) = self.modules.lock().unwrap().get_output(src) {
-    //             // println!("foobar");
-    //             // warn!("mod_type {} => {:?}", src, self.modules.indeces.get(src));
-    //             mods.into_iter()
-    //                 .for_each(|(output, sample)| src_samples[src][output as usize] += sample);
-    //         } else {
-    //             break;
-    //         }
-    //     }
-    //
-    //     let mut dest_samples = [[0.0; 16]; u8::MAX as usize];
-    //     let mut destinations: Vec<(u8, u8)> = Vec::with_capacity(256);
-    //
-    //     for con in self.connections.lock().unwrap().iter() {
-    //         dest_samples[con.dest_module as usize][con.dest_input as usize] +=
-    //             src_samples[con.src_module as usize][con.src_output as usize];
-    //
-    //         let dest = (con.dest_module, con.dest_input);
-    //
-    //         if !destinations.contains(&dest) {
-    //             destinations.push(dest);
-    //         }
-    //     }
-    //
-    //     for (dest_mod, dest_in) in destinations {
-    //         let sample = dest_samples[dest_mod as usize][dest_in as usize];
-    //
-    //         if dest_mod == 0 {
-    //             self.output.recv_samples(0, &vec![sample]);
-    //         } else {
-    //             self.modules.lock().unwrap().send_sample_to(
-    //                 dest_mod as usize,
-    //                 dest_in as usize,
-    //                 &vec![sample],
-    //             );
-    //         }
-    //     }
-    //     // }
-    // }
+    pub fn play(&self, note: Note) {
+        let mut playing = self.playing.lock().unwrap();
+
+        if playing
+            .iter()
+            .filter(|(_, n)| *n == note)
+            .peekable()
+            .peek()
+            .is_none()
+        {
+            let mut mods = self.modules.lock().unwrap();
+
+            if let Some(i) = mods.vco.iter_mut().enumerate().find_map(|(i, f)| {
+                if f.osc.frequency == 0.0 {
+                    Some(i)
+                } else {
+                    None
+                }
+            }) {
+                mods.vco[i].set_note(note);
+                playing.push((i, note));
+                mods.filter[i].envelope.open_filter(vec![1.0]);
+            } else {
+                error!("already playing notes");
+            }
+        } else {
+            error!("note {note} is already being played");
+        }
+    }
+
+    pub fn stop(&self, note: Note) {
+        if self
+            .playing
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, n)| *n == note)
+            .peekable()
+            .peek()
+            .is_some()
+        {
+            let mut mods = self.modules.lock().unwrap();
+
+            if let Some(i) = mods.vco.iter_mut().enumerate().find_map(|(i, f)| {
+                if f.osc.frequency == note.into() {
+                    Some(i)
+                } else {
+                    None
+                }
+            }) {
+                mods.vco[i].osc.set_frequency(0.0);
+                mods.filter[i].envelope.open_filter(vec![0.0]);
+            } else {
+                error!("already playing notes");
+            }
+        } else {
+            error!("note {note} is already being played");
+        }
+
+        self.playing.lock().unwrap().retain(|(_, n)| *n != note);
+    }
 
     /// connects src module to dest module
     pub fn connect(

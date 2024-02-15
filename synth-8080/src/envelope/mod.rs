@@ -1,9 +1,5 @@
-use crate::{
-    common::{Connection, Module},
-    Float,
-};
+use crate::{common::Module, Float};
 use anyhow::Result;
-use std::sync::{Arc, Mutex};
 use tracing::*;
 
 pub mod ad;
@@ -57,6 +53,8 @@ pub enum FilterType {
     ADBDR,
     ADSR,
     OC,
+    // TODO: Write AD filter
+
     // AD,
 }
 
@@ -86,8 +84,8 @@ impl From<Float> for FilterType {
 pub struct EnvelopeFilter {
     /// which filter is currently in use
     pub filter_type: FilterType,
-    /// where to send the audio that gets generated
-    pub outputs: Arc<Mutex<Vec<Connection>>>,
+    // /// where to send the audio that gets generated
+    // pub outputs: Arc<Mutex<Vec<Connection>>>,
     /// the filter that is currently in use
     pub envelope: Box<dyn Envelope>,
     /// stores the audio input sample
@@ -100,7 +98,7 @@ impl EnvelopeFilter {
     pub fn new(id: u8) -> Self {
         Self {
             filter_type: FilterType::None,
-            outputs: Arc::new(Mutex::new(Vec::new())),
+            // outputs: Arc::new(Mutex::new(Vec::new())),
             envelope: Box::new(adbdr::Filter::new()),
             audio_in: 0.0,
             id,

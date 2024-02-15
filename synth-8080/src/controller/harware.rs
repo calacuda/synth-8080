@@ -52,25 +52,9 @@ impl Future for HardwareControls {
 
                 if cmd == "play" {
                     info!("setting Notes");
-                    self.controller.modules.lock().unwrap().vco[0].set_note(Note::A4);
-                    self.controller.modules.lock().unwrap().filter[0]
-                        .envelope
-                        .open_filter(vec![1.0]);
-                    // let mut os = note.lock().unwrap();
-                    // *os = Note::A4.into();
-                    //
-                    // let mut es = filter_open.lock().unwrap();
-                    // *es = 1.0;
+                    self.controller.play(Note::A4);
                 } else if cmd == "stop" {
-                    self.controller.modules.lock().unwrap().filter[0]
-                        .envelope
-                        .open_filter(vec![0.0]);
-                    // modules.lock().unwrap().vco[0].set_note;
-                    // let mut os = note.lock().unwrap();
-                    // *os = 0.0;
-                    //
-                    // let mut es = filter_open.lock().unwrap();
-                    // *es = 0.0;
+                    self.controller.stop(Note::A4);
                 } else if cmd == "power-off" {
                     cx.waker().wake_by_ref();
                     return Poll::Ready(());

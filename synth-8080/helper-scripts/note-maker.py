@@ -12,7 +12,7 @@ def mk_variant(name):
 
 def mk_enum(names, notes):
     body = "\n".join([mk_variant(name) for name in names])
-    return f"#[derive(Debug, Clone, Copy, Deserialize)]\npub enum Note {{\n{body}\n}}"
+    return f"#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]\npub enum Note {{\n{body}\n}}"
 
 
 def mk_impl_float(names, notes):
