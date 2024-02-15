@@ -4,7 +4,7 @@
 2. [x] write output node
 3. [x] test VCO, minimal Control server, and output Node
 4. [x] write a default implementation of a sample generator that take a lambda to generate samples || a macro that writes the boiler plate
-    - NOTE: uses a function that takes callbacks.
+    - ~~NOTE: use a function that takes callbacks.~~
 5. [ ] write other modules
     - [x] ADBDR
     - [x] ADSR
@@ -13,7 +13,7 @@
     - [x] Chorus (probably needs some fixing but its hard to tell with just a pure wave form and no knobs)
     - [x] Delay (same as echo just a different implementation)
     - [x] Echo
-    - [ ] Attenuator
+    - [ ] Attenuator (optional)
     - [x] LFO
     <!-- - [ ] Mid-Pass -->
     - [x] Output
@@ -29,7 +29,12 @@
 7. [x] add tanh to all inputs that except mutiple signals.
 8. [x] finish controller
 9. [ ] write the code for the micro-controller to read the controlles
-10. [ ] add audio input
+    - [ ] design layout of controlles
+    - [ ] make circuit diagram
+    - [ ] design UART communication API
+    - [ ] write code
+        - [ ] make enums for commands and impl to && from slice of U8s
+10. [ ] add audio input (probably with a secondary micro-controller)
 11. [ ] add a "get state" http end point for the tauri app to query
     - NOTE: use unix socket instead, will be more reasorce efficient
 12. [ ] write tauri GUI front end

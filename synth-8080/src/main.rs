@@ -208,7 +208,7 @@ async fn main() -> Result<()> {
     // join!(synth_handle, hardware_handle, audio_handle);
     // sleep(Duration::from_secs(2)).await;
 
-    warn!("about to stop syntheses");
+    warn!("stopping syntheses");
 
     audio_out_thread.abort();
 

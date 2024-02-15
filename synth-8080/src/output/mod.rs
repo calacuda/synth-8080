@@ -4,7 +4,7 @@ use rodio::{OutputStream, Source};
 use tokio::spawn;
 use tracing::*;
 
-// TODO: Add a volume input to output
+// TODO: Add a volume input to this
 pub const N_INPUTS: u8 = 1;
 pub const N_OUTPUTS: u8 = 0;
 
@@ -25,7 +25,7 @@ impl Iterator for Audio {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.ext_sync.send(()).unwrap();
-        let sample = self.int_sync.recv().unwrap_or(0.0);
+        let sample = self.int_sync.try_recv().unwrap_or(0.0);
         // info!("sample => {sample}");
         Some(sample as f32)
     }
