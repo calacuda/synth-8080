@@ -34,7 +34,8 @@
     - [ ] design UART communication API
     - [ ] write code
         - [ ] make enums for commands and impl to && from slice of U8s
-10. [ ] add audio input (probably with a secondary micro-controller)
+10. [ ] add audio input (see no. 5 - `write other modules`)
+    - NOTE: probably with a secondary micro-controller
 11. [ ] add a "get state" http end point for the tauri app to query
     - NOTE: use unix socket instead, will be more reasorce efficient
 12. [ ] write tauri GUI front end
