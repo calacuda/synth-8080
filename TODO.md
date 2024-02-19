@@ -29,11 +29,11 @@
 7. [x] add tanh to all inputs that except mutiple signals.
 8. [x] finish controller
 9. [ ] write the code for the micro-controller to read the controlles
-    - [ ] design layout of controlles
-    - [ ] make circuit diagram
-    - [ ] design UART communication API
+    - [x] design layout of controlles
+    - [x] make circuit diagram
+    - [x] design UART communication API
     - [ ] write code
-        - [ ] make enums for commands and impl to && from slice of U8s
+        - [x] make enums for commands and impl to && from slice of U8s
 10. [ ] add audio input (see no. 5 - `write other modules`)
     - NOTE: probably with a secondary micro-controller
 11. [ ] add a "get state" http end point for the tauri app to query
