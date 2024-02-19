@@ -1,6 +1,5 @@
 use crate::Float;
-
-pub mod notes;
+pub use lib::notes;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModuleType {
@@ -21,13 +20,13 @@ pub struct ModuleInfo {
     pub mod_type: ModuleType,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Connection {
-    pub src_module: u8,
-    pub src_output: u8,
-    pub dest_module: u8,
-    pub dest_input: u8,
-}
+// #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+// pub struct Connection {
+//     pub src_module: u8,
+//     pub src_output: u8,
+//     pub dest_module: u8,
+//     pub dest_input: u8,
+// }
 
 pub trait Module {
     /// handles recieving a sample on a designated input

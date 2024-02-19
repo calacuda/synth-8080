@@ -1,22 +1,10 @@
 use crate::{common::bend_range, Float};
-use serde::Deserialize;
+pub use lib::OscType;
 
 pub mod saw;
 pub mod sine;
 pub mod square;
 pub mod triangle;
-
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OscType {
-    #[serde(rename = "sine", alias = "sin")]
-    Sine,
-    #[serde(rename = "square", alias = "squ")]
-    Square,
-    #[serde(rename = "triangle", alias = "tri")]
-    Triangle,
-    #[serde(rename = "saw-tooth", alias = "sawtooth", alias = "saw")]
-    SawTooth,
-}
 
 pub trait Osc: Send {
     fn get_sample(&mut self) -> Float;

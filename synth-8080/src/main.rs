@@ -2,7 +2,8 @@
 use anyhow::{bail, Result};
 use common::Module;
 use common::ModuleType;
-use std::mem;
+// use std::mem;
+pub use lib::{Float, SAMPLE_RATE};
 use std::{future::Future, sync::Arc, task::Poll};
 use tokio::task::spawn;
 use tracing::*;
@@ -27,9 +28,9 @@ pub mod router;
 pub mod vco;
 
 // pub type Float = f32;
-pub type Float = f64;
-pub const SAMPLE_RATE: u32 = 48_000;
-pub const FLOAT_LEN: usize = mem::size_of::<Float>();
+// pub type Float = f64;
+// pub const SAMPLE_RATE: u32 = 48_000;
+// pub const FLOAT_LEN: usize = mem::size_of::<Float>();
 
 struct AudioGen {
     controller: Arc<controller::Controller>,
@@ -212,7 +213,7 @@ async fn main() -> Result<()> {
 
     audio_out_thread.abort();
 
-    info!("syntheses stopped");
+    info!("syntheses stoppedhttp://localhost/");
 
     Ok(())
 }

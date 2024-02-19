@@ -1,5 +1,5 @@
 use crate::{
-    common::{notes::Note, Connection, ModuleType},
+    common::{notes::Note, ModuleType},
     envelope::FilterType,
     output,
     router::Modules,
@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::ensure;
 use crossbeam_channel::{unbounded, Receiver};
+use lib::{Connection, Float};
 use std::sync::Mutex;
 use tracing::*;
 
@@ -90,7 +91,9 @@ impl Controller {
             let mut mods = self.modules.lock().unwrap();
 
             if let Some(i) = mods.vco.iter_mut().enumerate().find_map(|(i, f)| {
-                if f.osc.frequency == note.into() {
+                let note_freq: Float = note.into();
+
+                if f.osc.frequency == note_freq {
                     Some(i)
                 } else {
                     None

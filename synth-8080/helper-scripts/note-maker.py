@@ -1,5 +1,17 @@
-import pandas as pd
+"""
+note-maker.py
 
+prints a out a rust enum of all notes and frequencies.
+
+Deprecated: bc the web page hosting the html table no longer exists, and 
+I'm too lazy to reqrite this
+
+
+By: Calacuda | Mit License | Epoch: ?
+"""
+
+
+import pandas as pd
 
 
 def mk_var_name(name):
@@ -34,6 +46,7 @@ def mk_impl_display(names):
 
 
 def main():
+    # page no longer exists
     df = pd.read_html('https://pages.mtu.edu/~suits/notefreqs.html')[1]
 
     notes = { name: row[1] for index, row in df.iterrows() for name in row[0].split('/')}

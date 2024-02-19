@@ -68,7 +68,7 @@ impl Filter {
     fn set_decay(&mut self, decay_speed: Float) {
         if decay_speed != self.decay_speed {
             self.decay_speed = decay_speed;
-            self.decay = -1.0 / (self.sample_rate * decay_speed);
+            self.decay = -(1.0 - self.threshold) / (self.sample_rate * decay_speed);
         }
     }
 

@@ -32,7 +32,7 @@ impl Module for ReverbModule {
     fn get_samples(&mut self) -> Vec<(u8, Float)> {
         vec![(
             0,
-            self.verb.calc_sample(self.audio_in as f32, self.gain) as Float,
+            self.audio_in + self.verb.calc_sample(self.audio_in as f32, self.gain) as Float,
         )]
     }
 
