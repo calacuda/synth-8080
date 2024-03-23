@@ -1,9 +1,13 @@
 use crate::{notes::Note, Float, ModuleId, OscType};
 use serde::{Deserialize, Serialize};
 
-/// commands that can be sent to the synth via uart
-#[derive(Deserialize, Serialize)]
+/// commands that can be sent to the synth via uart or over a unix-socket
+#[derive(Deserialize, Serialize, PartialEq)]
 pub enum SynthCmd {
+    /// requests the entire, absolute state of the synth
+    GetState,
+    /// identifies the sender
+    Identify(SynthId),
     /// plays a note
     Play(Note), // note is encoded as 'c#4' as a string, for example.
     /// stops playing a note
@@ -56,4 +60,16 @@ pub enum SynthCmd {
     Disconnect(ModuleId, u8, ModuleId, u8),
     /// bend pitch by amount
     PitchBend(Float),
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Eq)]
+pub enum SynthId {
+    /// the synth
+    Synth,
+    /// the display (displayes connections on a monitor)
+    DisplayClient,
+    /// audio input board
+    AudioInBoard,
+    /// board incharge of knobs and switches
+    ControlsBoard,
 }

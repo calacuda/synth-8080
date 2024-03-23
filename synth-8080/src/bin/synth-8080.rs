@@ -2,30 +2,13 @@
 use anyhow::{bail, Result};
 use common::Module;
 use common::ModuleType;
-// use std::mem;
-pub use lib::{Float, SAMPLE_RATE};
+// pub use lib::{Float, SAMPLE_RATE};
 use std::{future::Future, sync::Arc, task::Poll};
 use tokio::task::spawn;
 use tracing::*;
 
-pub type JoinHandle = tokio::task::JoinHandle<()>;
-
-pub mod audio_in;
-pub mod chorus;
-pub mod common;
-pub mod controller;
-pub mod delay;
-pub mod echo;
-pub mod envelope;
-pub mod gain;
-pub mod lfo;
-pub mod mid_pass;
-pub mod osc;
-pub mod output;
-pub mod overdrive;
-pub mod reverb;
-pub mod router;
-pub mod vco;
+// pub type JoinHandle = tokio::task::JoinHandle<()>;
+use synth_8080::*;
 
 // pub type Float = f32;
 // pub type Float = f64;
@@ -42,7 +25,7 @@ impl Future for AudioGen {
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         // self.deref().controller.step();
         if let Err(e) = self.controller.sync.recv() {
-            error!("error recieving sync message: {e}");
+            error!("error receiving sync message: {e}");
         };
 
         let mut src_samples = [[0.0; 16]; u8::MAX as usize];
