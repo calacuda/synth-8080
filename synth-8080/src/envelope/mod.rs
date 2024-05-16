@@ -34,7 +34,7 @@ pub trait Envelope: Send {
         self.set_env(new_env);
     }
 
-    /// gets the step ammount based on phase
+    /// gets the step amount based on phase
     fn get_step(&mut self) -> Float;
 
     /// stpes the phase (shifts to the next phase if the conditions are right)
@@ -44,14 +44,17 @@ pub trait Envelope: Send {
     /// the input doesn't exist for the current filter
     fn take_input(&mut self, input: u8, samples: Vec<Float>) -> Result<()>;
 
-    /// opens or closses the filter depending on the sum of `samples`. returns wether the filter is
+    /// opens or closses the filter depending on the sum of `samples`. returns whether the filter is
     /// pressed.
     fn open_filter(&mut self, samples: Vec<Float>) -> bool;
+
+    /// returns true if the filter is not in its neuteral state.
+    fn pressed(&mut self) -> bool;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum FilterType {
-    None,
+    // None,
     ADBDR,
     ADSR,
     OC,
@@ -61,7 +64,7 @@ pub enum FilterType {
 impl Into<Float> for FilterType {
     fn into(self) -> Float {
         match self {
-            Self::None => 1.0,
+            // Self::None => 1.0,
             Self::ADBDR => 2.0,
             Self::ADSR => 3.0,
             Self::OC => 4.0,
@@ -73,12 +76,13 @@ impl Into<Float> for FilterType {
 impl From<Float> for FilterType {
     fn from(value: Float) -> Self {
         match value {
-            1.0..2.0 => Self::None,
+            // 1.0..2.0 => Self::None,
             2.0..3.0 => Self::ADBDR,
             3.0..4.0 => Self::ADSR,
             4.0..5.0 => Self::OC,
             5.0..6.0 => Self::AD,
-            _ => Self::None,
+            // _ => Self::None,
+            _ => Self::OC,
         }
     }
 }
@@ -99,9 +103,9 @@ pub struct EnvelopeFilter {
 impl EnvelopeFilter {
     pub fn new(id: u8) -> Self {
         Self {
-            filter_type: FilterType::None,
+            filter_type: FilterType::ADBDR,
             pressed: false,
-            envelope: Box::new(ad::Filter::new()),
+            envelope: Box::new(adbdr::Filter::new()),
             audio_in: 0.0,
             id,
         }
@@ -111,12 +115,16 @@ impl EnvelopeFilter {
         self.filter_type = filter_type;
         info!("setting filter type to {:?}", self.filter_type);
         self.envelope = match self.filter_type {
-            FilterType::None => Box::new(none::Filter::new()),
+            // FilterType::None => Box::new(none::Filter::new()),
             FilterType::ADSR => Box::new(adsr::Filter::new()),
             FilterType::ADBDR => Box::new(adbdr::Filter::new()),
             FilterType::OC => Box::new(oc::Filter::new()),
             FilterType::AD => Box::new(ad::Filter::new()),
         };
+    }
+
+    pub fn is_pressed(&mut self) -> bool {
+        self.envelope.pressed()
     }
 }
 
@@ -139,6 +147,7 @@ impl Module for EnvelopeFilter {
         } else if input_n == FILTER_OPEN_IN {
             // let input: Float = samples.iter().sum();
             self.pressed = self.envelope.open_filter(samples.to_vec());
+            info!("pressed => {}", self.pressed);
         } else if input_n == 3 {
             let _ = self.envelope.take_input(0, samples.to_vec());
         } else if input_n == 4 {

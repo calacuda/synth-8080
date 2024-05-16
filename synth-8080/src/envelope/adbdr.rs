@@ -93,17 +93,17 @@ impl Filter {
         if self.phase == Phase::Attack && self.env >= 1.0 {
             self.phase = Phase::Decay1;
             self.env = 1.0;
-            // info!("chaning phase to => {:?}", self.phase);
+            // info!("changing phase to => {:?}", self.phase);
         } else if self.phase == Phase::Decay1 && self.env <= self.threshold {
             self.phase = Phase::Decay2;
-            // info!("chaning phase to => {:?}", self.phase);
+            // info!("changing phase to => {:?}", self.phase);
         } else if self.phase == Phase::Decay2 && self.env <= self.release_threshold {
             self.phase = Phase::Release;
-            // info!("chaning phase to => {:?}", self.phase);
+            // info!("changing phase to => {:?}", self.phase);
         } else if self.phase == Phase::Release && self.env <= 0.0 {
             self.phase = Phase::Neutural;
             self.env = 0.0;
-            // info!("chaning phase to => {:?}", self.phase);
+            // info!("changing phase to => {:?}", self.phase);
         }
     }
 }
@@ -136,11 +136,11 @@ impl Envelope for Filter {
         let sample: Float = samples.iter().sum::<Float>().tanh();
         // info!("envelope filter is open: {}", sample >= 0.75);
 
-        if self.pressed && sample <= 0.75 {
+        if self.pressed() && sample <= 0.75 {
             // info!("release");
             self.phase = Phase::Release;
             self.pressed = false;
-        } else if !self.pressed && self.phase == Phase::Neutural && sample >= 0.75 {
+        } else if self.phase == Phase::Neutural && sample >= 0.75 {
             // info!("pressed");
             self.phase = Phase::Attack;
             self.pressed = true;
@@ -165,5 +165,9 @@ impl Envelope for Filter {
         }
 
         Ok(())
+    }
+
+    fn pressed(&mut self) -> bool {
+        self.phase != Phase::Neutural
     }
 }

@@ -1,8 +1,9 @@
-use crate::{common::Module, Float, JoinHandle};
+// use crate::spawn;
+use crate::{common::Module, Float, JoinHandle, SAMPLE_RATE};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use rodio::{OutputStream, Source};
-use tokio::spawn;
+use rodio::{OutputStream, OutputStreamHandle, Source};
 use tracing::*;
+// use tokio::spawn;
 
 // TODO: Add a volume input to this
 pub const N_INPUTS: u8 = 1;
@@ -24,6 +25,7 @@ impl Iterator for Audio {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // info!("beginning of next.");
         self.ext_sync.send(()).unwrap();
         let sample = self.int_sync.try_recv().unwrap_or(0.0);
         // info!("sample => {sample}");
@@ -41,7 +43,10 @@ impl Source for Audio {
     }
 
     fn sample_rate(&self) -> u32 {
-        48_000
+        // 48_000
+        // 44_100
+        // 22_050
+        SAMPLE_RATE
     }
 
     fn total_duration(&self) -> Option<std::time::Duration> {
@@ -50,16 +55,16 @@ impl Source for Audio {
 }
 
 pub struct Output {
-    /// used for internal syncronization with the audio buffer sent to rodio
+    /// used for internal synchronization with the audio buffer sent to rodio
     int_sync: Sender<Float>,
     /// the current sample
     sample: Float,
-    /// the rodio output stream, it itsn't used but must never be dropped else audio ouput will cease
+    /// the rodio output stream, it itsn't used but must never be dropped else audio output will cease
     _stream: OutputStream,
 }
 
 impl Output {
-    pub fn new(ext_sync: Sender<()>) -> (Self, JoinHandle) {
+    pub fn new(ext_sync: Sender<()>) -> (Self, (OutputStreamHandle, Audio)) {
         info!("making audio output struct");
         let sample = 0.0;
         let (int_sync, rx) = unbounded();
@@ -75,9 +80,10 @@ impl Output {
                 sample,
                 _stream,
             },
-            spawn(async move {
-                stream_handle.play_raw(audio).unwrap();
-            }),
+            // spawn(async move {
+            //     stream_handle.play_raw(audio).unwrap();
+            // }),
+            (stream_handle, audio),
         )
     }
 }
@@ -97,3 +103,6 @@ impl Module for Output {
         };
     }
 }
+
+unsafe impl Sync for Output {}
+unsafe impl Send for Output {}

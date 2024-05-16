@@ -41,6 +41,7 @@
 12. [ ] write tauri GUI front end
 13. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)
 14. [ ] build the housing
-15. [ ] write midi inputs
-    - [ ] write async input controller
-    - [ ] test with raspberry-pi pico || arduino pro-micro (at least one of them should be able to send midi input)
+15. [x] write midi inputs
+    - [x] ~~write async input controller~~ Not necessary
+    - [x] test with raspberry-pi pico || arduino pro-micro (at least one of them should be able to send midi input)
+16. [ ] make a new struct that holds a configurable number of VCOs and envelope filters. to achieve polyphony with "one" struct.

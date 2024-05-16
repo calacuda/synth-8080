@@ -27,6 +27,9 @@ embassy = ["esp-idf-svc/embassy-sync", "esp-idf-svc/critical-section", "esp-idf-
 log = { version = "0.4", default-features = false }
 esp-idf-svc = { version = "0.48", default-features = false }
 lib = { package = "synth-8080-lib", path = "../lib/" }
+serde = { version = "1.0.196", features = ["derive"] }
+serde_cbor = "0.11.2"
+anyhow = "1.0.80"
 
 [build-dependencies]
 embuild = "0.31.3"

@@ -1,17 +1,20 @@
 use crate::{
     common::{notes::Note, ModuleType},
     envelope::FilterType,
-    output,
+    output::{self, Audio},
     router::Modules,
     JoinHandle,
 };
 use anyhow::ensure;
 use crossbeam_channel::{unbounded, Receiver};
 use lib::{Connection, Float};
+use rodio::OutputStreamHandle;
 use std::sync::Mutex;
 use tracing::*;
 
-pub mod harware;
+#[cfg(feature = "hardware")]
+pub mod hardware;
+pub mod midi;
 
 pub struct Controller {
     /// the liist of connections
@@ -26,7 +29,9 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub async fn new(to_build: &[ModuleType]) -> anyhow::Result<(Self, JoinHandle)> {
+    pub async fn new(
+        to_build: &[ModuleType],
+    ) -> anyhow::Result<(Self, (OutputStreamHandle, Audio))> {
         let (tx, sync) = unbounded();
         let (output, jh) = output::Output::new(tx);
         let modules = Mutex::new(Modules::from(to_build));
@@ -47,68 +52,87 @@ impl Controller {
         let mut playing = self.playing.lock().unwrap();
         let mut mods = self.modules.lock().unwrap();
 
-        if let Some(i) =
-            mods.filter.iter_mut().enumerate().find_map(
-                |(i, f)| {
-                    if !f.pressed {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                },
-            )
-            && playing
-                .iter()
-                .filter(|(_, n)| *n == note)
-                .peekable()
-                .peek()
-                .is_none()
-        {
-            // if
-            // {
-            mods.vco[i].set_note(note);
-            playing.push((i, note));
-            mods.filter[i].envelope.open_filter(vec![1.0]);
-            // } else {
-            //     error!("already playing notes");
-            // }
-        } else {
-            error!("note {note} is already being played");
-        }
-    }
-
-    pub fn stop(&self, note: Note) {
-        if self
-            .playing
-            .lock()
-            .unwrap()
+        if let Some(i) = mods.filter.iter_mut().enumerate().find_map(|(i, f)| {
+            if !f.is_pressed() {
+                Some(i)
+            } else {
+                None
+            }
+        }) && playing
             .iter()
             .filter(|(_, n)| *n == note)
             .peekable()
             .peek()
-            .is_some()
+            .is_none()
+        {
+            // if
+            // {
+            info!("using vco and env filter combo at: {i}");
+            mods.vco[i].set_note(note);
+            playing.push((i, note));
+            mods.filter[i].envelope.open_filter(vec![1.0]);
+            // mods.filter[i].pressed = true;
+            // } else {
+            //     error!("already playing notes");
+            // }
+        } else {
+            error!("note {note} is already being played or there are no free oscilators");
+        }
+    }
+
+    pub fn stop(&self, note: Note) {
+        let mut playing = self.playing.lock().unwrap();
+
+        // if playing
+        //     .iter()
+        //     .filter(|(_, n)| *n == note)
+        //     .peekable()
+        //     .peek()
+        //     .is_some()
+        // {
+        //     let mut mods = self.modules.lock().unwrap();
+        //
+        //     if let Some(i) = mods.vco.iter_mut().enumerate().find_map(|(i, f)| {
+        //         let note_freq: Float = note.into();
+        //
+        //         if f.osc.frequency == note_freq {
+        //             Some(i)
+        //         } else {
+        //             None
+        //         }
+        //     }) {
+        //         mods.vco[i].osc.set_frequency(0.0);
+        //         mods.filter[i].envelope.open_filter(vec![0.0]);
+        //         (*playing) = playing
+        //             .clone()
+        //             .into_iter()
+        //             .filter(|(_, n)| *n != note)
+        //             .collect();
+        //     } else {
+        //         error!("not playing ");
+        //     }
+        // let note_freq: Float = note.into();
+
+        if let Some(i) = playing
+            .iter()
+            .find_map(|(i, f)| if *f == note { Some(*i) } else { None })
         {
             let mut mods = self.modules.lock().unwrap();
 
-            if let Some(i) = mods.vco.iter_mut().enumerate().find_map(|(i, f)| {
-                let note_freq: Float = note.into();
+            mods.vco[i].osc.set_frequency(0.0);
+            mods.filter[i].envelope.open_filter(vec![0.0]);
+            // (*playing) = playing
+            //     .clone()
+            //     .into_iter()
+            //     .filter(|(_, n)| *n != note)
+            //     .collect();
 
-                if f.osc.frequency == note_freq {
-                    Some(i)
-                } else {
-                    None
-                }
-            }) {
-                // mods.vco[i].osc.set_frequency(0.0);
-                mods.filter[i].envelope.open_filter(vec![0.0]);
-            } else {
-                error!("already playing notes");
-            }
+            info!("stopped note {note}");
         } else {
-            error!("note {note} is already being played");
+            error!("note {note} is not being played");
         }
 
-        self.playing.lock().unwrap().retain(|(_, n)| *n != note);
+        playing.retain(|(_, n)| *n != note);
     }
 
     /// sets filter type for all filters associated with a VCO

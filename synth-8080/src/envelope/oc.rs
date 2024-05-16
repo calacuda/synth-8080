@@ -32,4 +32,8 @@ impl Envelope for Filter {
         self.open = samples.iter().sum::<Float>().tanh() >= 0.75;
         self.open
     }
+
+    fn pressed(&mut self) -> bool {
+        false
+    }
 }

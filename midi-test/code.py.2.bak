@@ -1,0 +1,99 @@
+import digitalio
+import board
+import touchio
+import usb_midi
+import adafruit_midi
+import board
+from time import sleep
+from adafruit_midi.note_on  import NoteOn
+from adafruit_midi.note_off  import NoteOff
+from adafruit_debouncer import Debouncer, Button
+
+# THRESHOLD = 1000
+# # THRESHOLD = 100
+# t = touchio.TouchIn(board.GP13)
+# t.threshold = t.raw_value + THRESHOLD
+
+# pads = [None] * 12
+# for i in range(12):
+    # t = touchio.TouchIn(board.GP13)
+    # t.threshold = t.raw_value + THRESHOLD
+    # touchpad = Button(t, value_when_pressed=True)
+    # pads[i] = touchpad
+# touch_vals = [t.raw_value] * 12
+
+key = digitalio.DigitalInOut(board.GP14)
+key_switch = Button(key, value_when_pressed=True)
+
+midi_velocity = 64  # midpoint
+midi_channel = 0  # 0-15
+midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1])
+
+# select_pins = [digitalio.DigitalInOut(25), digitalio.DigitalInOut(24), digitalio.DigitalInOut(23), digitalio.DigitalInOut(22)]
+select_pins = [
+    digitalio.DigitalInOut(board.GP25),
+    digitalio.DigitalInOut(board.GP24),
+    digitalio.DigitalInOut(board.GP23),
+    digitalio.DigitalInOut(board.GP22)
+]
+
+note_offset = 60
+playing = [0] * 12
+
+for pin in select_pins:
+    pin.direction = digitalio.Direction.OUTPUT
+
+
+def select(key_num):
+    for pin in select_pins:
+        pin.value = False
+
+    if key_num & 0b0001:
+        select_pins[0].value = True
+
+    if key_num & 0b0010:
+        select_pins[1].value = True
+
+    if key_num & 0b0100:
+        select_pins[2].value = True
+
+    if key_num & 0b1000:
+        select_pins[3].value = True
+
+
+while True:
+    # touchpad.update()
+    # if touchpad.rose:
+    #
+    #     print("Touch On")
+    # if touchpad.fell:
+    #     print("Touch Off")
+    # print("t.raw_value : ", t.raw_value)
+    for i in range(12):
+        # print(i)
+        select(i)
+        # sleep(0.001)
+        # pads[i].update()
+        # value = t.raw_value
+        # print("t.raw_value : ", t.raw_value, "t.threshold : ", t.threshold)
+        # print(f"value change : ", value - touch_vals[i])
+
+        if key_switch.value and not playing[i]:
+            note = note_offset + i
+            playing[i] = note
+            midi.send( NoteOn(note, midi_velocity), channel=midi_channel )
+            print(f"playing note: {note}")
+        elif key_switch.value and playing[i]:
+            note = playing[i]
+            midi.send( NoteOff(note, midi_velocity), channel=midi_channel )
+            playing[i] = 0
+            print(f"stopping note: {note}")
+
+        # touch_vals[i] = value
+
+
+
+
+
+
+

@@ -3,9 +3,13 @@ use serde::{Deserialize, Serialize};
 pub mod communication;
 pub mod notes;
 
-pub type Float = f64;
+pub type Float = f32;
 pub type ModuleId = u8;
-pub const SAMPLE_RATE: u32 = 48_000;
+// pub const SAMPLE_RATE: u32 = 48_000;
+// pub const SAMPLE_RATE: u32 = 44_100;
+// pub const SAMPLE_RATE: u32 = 22_050;
+// pub const SAMPLE_RATE: u32 = 16_000;
+pub const SAMPLE_RATE: u32 = 24_000;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OscType {

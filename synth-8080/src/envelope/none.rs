@@ -31,4 +31,8 @@ impl Envelope for Filter {
 
         input >= 0.75
     }
+
+    fn pressed(&mut self) -> bool {
+        false
+    }
 }

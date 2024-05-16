@@ -29,7 +29,7 @@ pub struct ModuleInfo {
 // }
 
 pub trait Module {
-    /// handles recieving a sample on a designated input
+    /// handles receiving a sample on a designated input
     fn recv_samples(&mut self, input_n: u8, samples: &[Float]);
 
     /// produces a sample from all outputs

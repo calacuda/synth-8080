@@ -149,4 +149,8 @@ impl Envelope for Filter {
 
         Ok(())
     }
+
+    fn pressed(&mut self) -> bool {
+        self.phase != Phase::Neutural
+    }
 }

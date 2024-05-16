@@ -48,7 +48,7 @@ impl Future for HardwareControls {
                 let raw_input = String::from_utf8_lossy(&serial_buf[..t]);
                 let cmd = raw_input.trim();
 
-                info!("recieved command: {cmd:?}");
+                info!("received command: {cmd:?}");
 
                 if cmd == "play" {
                     info!("setting Notes");

@@ -1,0 +1,34 @@
+# print("Hello World!")
+import digitalio
+import usb_midi
+import adafruit_midi
+import board
+from adafruit_midi.note_on  import NoteOn
+from adafruit_midi.note_off  import NoteOff
+from adafruit_debouncer import Debouncer, Button
+
+
+midi_velocity = 64  # midpoint
+midi_channel = 0  # 0-15
+
+notes_on = False
+
+button = digitalio.DigitalInOut(board.GP13)
+button.switch_to_input(pull=digitalio.Pull.DOWN)
+midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1])
+
+while True:
+    # print("foo")
+    if button.value and not notes_on:
+        print("playing")
+        noteOn = NoteOn(69, midi_velocity)
+        midi.send( noteOn, channel=midi_channel )
+        notes_on = True
+    elif not button.value and notes_on:
+        # print("stopping")
+        noteOn = NoteOff(69, midi_velocity)
+        midi.send( noteOn, channel=midi_channel )
+        notes_on = False
+
+    # else:
+    #     print(f"button.value :  {button.value}")

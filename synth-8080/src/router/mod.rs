@@ -23,7 +23,7 @@ pub struct Modules {
     // pub audio_in: Vec<(Vec<Input>, Vec<Output>)>,
     /// allows for easier indexing into this struct. the index of the items in this Vec corespond
     /// to the modules ID
-    pub indeces: Vec<(ModuleType, usize)>,
+    pub indices: Vec<(ModuleType, usize)>,
 }
 
 impl Modules {
@@ -32,7 +32,7 @@ impl Modules {
             return Some(Vec::new());
         }
 
-        let (mod_type, i) = self.indeces.get(id - 1)?;
+        let (mod_type, i) = self.indices.get(id - 1)?;
         // info!("({mod_type:?}, {i})");
         // info!("n vcos {}", self.vco.len());
 
@@ -59,7 +59,7 @@ impl Modules {
             return;
         }
 
-        let (mod_type, i) = self.indeces[id - 1];
+        let (mod_type, i) = self.indices[id - 1];
 
         match mod_type {
             ModuleType::Vco => self.vco[i].recv_samples(input as u8, samples),
@@ -86,40 +86,40 @@ impl From<&[ModuleType]> for Modules {
 
         iter.into_iter().for_each(|mod_type| match mod_type {
             ModuleType::Vco => {
-                s.vco.push(crate::vco::Vco::new((s.indeces.len()) as u8));
-                s.indeces.push((*mod_type, s.vco.len() - 1));
+                s.vco.push(crate::vco::Vco::new((s.indices.len()) as u8));
+                s.indices.push((*mod_type, s.vco.len() - 1));
             }
             ModuleType::Lfo => {
-                s.lfo.push(crate::lfo::Lfo::new((s.indeces.len()) as u8));
-                s.indeces.push((*mod_type, s.lfo.len() - 1));
+                s.lfo.push(crate::lfo::Lfo::new((s.indices.len()) as u8));
+                s.indices.push((*mod_type, s.lfo.len() - 1));
             }
             ModuleType::EnvFilter => {
                 s.filter.push(crate::envelope::EnvelopeFilter::new(
-                    (s.indeces.len() - 1) as u8,
+                    (s.indices.len() - 1) as u8,
                 ));
-                s.indeces.push((*mod_type, s.filter.len() - 1));
+                s.indices.push((*mod_type, s.filter.len() - 1));
             }
             ModuleType::Echo => {
-                s.echo.push(crate::echo::Echo::new((s.indeces.len()) as u8));
-                s.indeces.push((*mod_type, s.echo.len() - 1));
+                s.echo.push(crate::echo::Echo::new((s.indices.len()) as u8));
+                s.indices.push((*mod_type, s.echo.len() - 1));
             }
             ModuleType::Chorus => {
                 s.chorus
-                    .push(crate::chorus::Chorus::new((s.indeces.len()) as u8));
-                s.indeces.push((*mod_type, s.chorus.len() - 1));
+                    .push(crate::chorus::Chorus::new((s.indices.len()) as u8));
+                s.indices.push((*mod_type, s.chorus.len() - 1));
             }
             ModuleType::Delay => {
                 s.delay
-                    .push(crate::delay::Delay::new((s.indeces.len()) as u8));
-                s.indeces.push((*mod_type, s.delay.len() - 1));
+                    .push(crate::delay::Delay::new((s.indices.len()) as u8));
+                s.indices.push((*mod_type, s.delay.len() - 1));
             }
             ModuleType::OverDrive => {
                 s.over_drive.push(crate::overdrive::OverDrive::new());
-                s.indeces.push((*mod_type, s.over_drive.len() - 1));
+                s.indices.push((*mod_type, s.over_drive.len() - 1));
             }
             ModuleType::Reverb => {
                 s.reverb.push(crate::reverb::ReverbModule::new());
-                s.indeces.push((*mod_type, s.reverb.len() - 1));
+                s.indices.push((*mod_type, s.reverb.len() - 1));
             }
             _ => {
                 error!(
