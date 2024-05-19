@@ -25,9 +25,9 @@ impl Iterator for Audio {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // info!("beginning of next.");
-        self.ext_sync.send(()).unwrap();
+        // self.ext_sync.send(()).unwrap();
         let sample = self.int_sync.try_recv().unwrap_or(0.0);
+        self.ext_sync.send(()).unwrap();
         // info!("sample => {sample}");
         Some(sample as f32)
     }
@@ -59,8 +59,9 @@ pub struct Output {
     int_sync: Sender<Float>,
     /// the current sample
     sample: Float,
-    /// the rodio output stream, it itsn't used but must never be dropped else audio output will cease
+    /// the rodio output stream, it isn't used but must never be dropped else audio output will cease
     _stream: OutputStream,
+    pub volume: Float,
 }
 
 impl Output {
@@ -68,6 +69,7 @@ impl Output {
         info!("making audio output struct");
         let sample = 0.0;
         let (int_sync, rx) = unbounded();
+        ext_sync.send(()).unwrap();
         let audio = Audio::new(ext_sync, rx);
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         info!("playing audio struct");
@@ -79,6 +81,7 @@ impl Output {
                 int_sync,
                 sample,
                 _stream,
+                volume: 1.0,
             },
             // spawn(async move {
             //     stream_handle.play_raw(audio).unwrap();
@@ -95,7 +98,7 @@ impl Module for Output {
 
     fn recv_samples(&mut self, _input_n: u8, samples: &[Float]) {
         let sample: Float = samples.iter().sum();
-        self.sample = sample.tanh();
+        self.sample = (sample * self.volume).tanh();
         // warn!("sample -> {sample}");
 
         if let Err(e) = self.int_sync.send(self.sample) {

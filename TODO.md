@@ -12,8 +12,9 @@
     - [ ] Audio In 
     - [x] Chorus (probably needs some fixing but its hard to tell with just a pure wave form and no knobs)
     - [x] Delay (same as echo just a different implementation)
+        - [ ] make delay just delay the signal. so it can be used to offset lfos.
     - [x] Echo
-    - [ ] Attenuator (optional)
+    - [ ] Attenuator
     - [x] LFO
     <!-- - [ ] Mid-Pass -->
     - [x] Output
@@ -25,11 +26,11 @@
     - [x] square
     - [x] triangle
     - [x] saw-tooth
-    - [x] overtones oscilator
-7. [x] add tanh to all inputs that except mutiple signals.
+    - [x] overtones oscillator
+7. [x] add tanh to all inputs that except multiple signals.
 8. [x] finish controller
-9. [ ] write the code for the micro-controller to read the controlles
-    - [x] design layout of controlles
+9. [ ] write the code for the micro-controller to read the controls
+    - [x] design layout of controls
     - [x] make circuit diagram
     - [x] design UART communication API
     - [ ] write code
@@ -44,4 +45,15 @@
 15. [x] write midi inputs
     - [x] ~~write async input controller~~ Not necessary
     - [x] test with raspberry-pi pico || arduino pro-micro (at least one of them should be able to send midi input)
-16. [ ] make a new struct that holds a configurable number of VCOs and envelope filters. to achieve polyphony with "one" struct.
+16. [x] make a new struct that holds a configurable number of VCOs and envelope filters. to achieve polyphony with "one" struct.
+17. [ ] add ability to edit connections that are already made.
+18. [ ] add ability to temporarily disconnect connections that are already made.
+19. [ ] add IPC (over usix socket or maybe websockets, to be more crossplatform) so other processes can change the synths parameters.
+20. [ ] -> add tauri events to change front end on synth-param changes <- (do this next)
+21. [ ] make the sliders set the value they control to 50% at load
+22. [ ] add scriptability (using a custom lisp dialect)
+    - [ ] design said dialect
+    - [ ] implement the basics
+    - [ ] build a std-lib
+    - [ ] add a IPC control for refreshing/reloading or even changing the loaded script (so a text editor can notify the synth on file saves.)
+    - [ ] 

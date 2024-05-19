@@ -1,13 +1,12 @@
 use crate::{
-    common::{notes::Note, ModuleType},
-    envelope::FilterType,
+    common::notes::Note,
     output::{self, Audio},
     router::Modules,
     JoinHandle,
 };
 use anyhow::ensure;
 use crossbeam_channel::{unbounded, Receiver};
-use lib::{Connection, Float};
+use lib::{Connection, FilterType, Float, ModuleType};
 use rodio::OutputStreamHandle;
 use std::sync::Mutex;
 use tracing::*;
@@ -22,9 +21,6 @@ pub struct Controller {
     pub modules: Mutex<Modules>,
     pub output: Mutex<output::Output>,
     pub sync: Receiver<()>,
-    // TODO: find lib to talk to MIDI device
-    // /// Connection to MIDI device
-    // pub midi: Arc<Mutex<>>,
     pub playing: Mutex<Vec<(usize, Note)>>,
 }
 

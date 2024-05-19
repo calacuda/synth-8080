@@ -37,7 +37,7 @@ impl Filter {
     pub fn new() -> Self {
         // info!("making ADBDR filter");
         let sample_rate = SAMPLE_RATE as Float;
-        let attack_speed = 0.01;
+        let attack_speed = 0.0001;
         let attack = 1.0 / (sample_rate * attack_speed);
         let decay_1_speed = 0.1;
         let decay_1 = -1.0 / (sample_rate * decay_1_speed);

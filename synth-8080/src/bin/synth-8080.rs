@@ -229,9 +229,9 @@ pub async fn main() -> Result<()> {
     // ctrlr.connect(1, 0, 0, 0)?;
     // // connect LFO to VCO volume input
     // ctrlr.connect(3, 0, 1, vco::VOLUME_INPUT)?;
-    ctrlr.modules.lock().unwrap().lfo[0].volume_in = 0.7;
-    ctrlr.modules.lock().unwrap().lfo[0].set_pitch(1.0);
-    ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
+    // ctrlr.modules.lock().unwrap().lfo[0].volume_in = 0.7;
+    // ctrlr.modules.lock().unwrap().lfo[0].set_pitch(1.0);
+    // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
     // sleep(Duration::from_secs_f64(1.0)).await;
     // ctrlr.connect(2, 0, 1, vco::VOLUME_INPUT)?;
     // ctrlr.connect(2, 0, 1, vco::PITCH_BEND_INPUT)?;
@@ -244,7 +244,7 @@ pub async fn main() -> Result<()> {
     // connect vco to output directly
     // ctrlr.connect(1, 0, 0, 0)?;
     // connect vco to adbdr
-    ctrlr.connect(1, 0, 2, envelope::AUDIO_IN)?;
+    // ctrlr.connect(1, 0, 2, envelope::AUDIO_IN)?;
     // connect adbdr to output
     // ctrlr.connect(2, 0, 0, 0)?;
     // connect adbdr to echo
@@ -252,9 +252,9 @@ pub async fn main() -> Result<()> {
     // connect echo to output
     // ctrlr.connect(4, 0, 0, 0)?;
     // connect adbdr to chorus
-    ctrlr.connect(2, 0, 5, chorus::AUDIO_INPUT)?;
+    // ctrlr.connect(2, 0, 5, chorus::AUDIO_INPUT)?;
     // connect chorus to output
-    ctrlr.connect(5, 0, 0, 0)?;
+    // ctrlr.connect(5, 0, 0, 0)?;
     // connect adbdr to delay
     // ctrlr.connect(2, 0, 6, delay::AUDIO_INPUT)?;
     // connect delay to output
@@ -269,6 +269,8 @@ pub async fn main() -> Result<()> {
     // ctrlr.connect(2, 0, 8, reverb::AUDIO_INPUT)?;
     // connect reverb to output
     // ctrlr.connect(8, 0, 0, 0)?;
+    _ = ctrlr.connect(1, 0, 4, chorus::AUDIO_INPUT);
+    _ = ctrlr.connect(4, 0, 0, 0);
 
     let audio = AudioGen {
         controller: ctrlr.clone(),

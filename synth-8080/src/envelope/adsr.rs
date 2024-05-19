@@ -7,7 +7,7 @@ pub const N_OUTPUTS: u8 = 1;
 
 pub const ATTACK_IN: u8 = 3; // sets attack speed in seconds
 pub const DECAY_IN: u8 = 4; // sets decay 1 speed in seconds
-pub const DECAY_THRESHOLD: u8 = 5; // sets the threshold between decay 1 & 2 in amplitude
+pub const DECAY_THRESHOLD: u8 = 5; // sets the threshold between decay 1 sustain in amplitude
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum Phase {

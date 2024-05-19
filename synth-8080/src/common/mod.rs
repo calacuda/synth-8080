@@ -1,18 +1,20 @@
 use crate::Float;
 pub use lib::notes;
+use lib::ModuleType;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ModuleType {
-    Vco,
-    Output,
-    Lfo,
-    Echo,
-    EnvFilter,
-    Chorus,
-    Delay,
-    OverDrive,
-    Reverb,
-}
+// #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+// pub enum ModuleType {
+//     Vco,
+//     Output,
+//     Lfo,
+//     Echo,
+//     EnvFilter,
+//     Chorus,
+//     Delay,
+//     OverDrive,
+//     Reverb,
+//     MCO, // Midi controlled Oscillator
+// }
 
 pub struct ModuleInfo {
     pub n_ins: u8,

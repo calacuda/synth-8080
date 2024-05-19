@@ -1,5 +1,6 @@
 use crate::{common::Module, Float};
 use anyhow::Result;
+use lib::FilterType;
 use tracing::*;
 
 pub mod ad;
@@ -50,41 +51,6 @@ pub trait Envelope: Send {
 
     /// returns true if the filter is not in its neuteral state.
     fn pressed(&mut self) -> bool;
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum FilterType {
-    // None,
-    ADBDR,
-    ADSR,
-    OC,
-    AD,
-}
-
-impl Into<Float> for FilterType {
-    fn into(self) -> Float {
-        match self {
-            // Self::None => 1.0,
-            Self::ADBDR => 2.0,
-            Self::ADSR => 3.0,
-            Self::OC => 4.0,
-            Self::AD => 5.0,
-        }
-    }
-}
-
-impl From<Float> for FilterType {
-    fn from(value: Float) -> Self {
-        match value {
-            // 1.0..2.0 => Self::None,
-            2.0..3.0 => Self::ADBDR,
-            3.0..4.0 => Self::ADSR,
-            4.0..5.0 => Self::OC,
-            5.0..6.0 => Self::AD,
-            // _ => Self::None,
-            _ => Self::OC,
-        }
-    }
 }
 
 pub struct EnvelopeFilter {
@@ -147,7 +113,7 @@ impl Module for EnvelopeFilter {
         } else if input_n == FILTER_OPEN_IN {
             // let input: Float = samples.iter().sum();
             self.pressed = self.envelope.open_filter(samples.to_vec());
-            info!("pressed => {}", self.pressed);
+            // info!("pressed => {}", self.pressed);
         } else if input_n == 3 {
             let _ = self.envelope.take_input(0, samples.to_vec());
         } else if input_n == 4 {

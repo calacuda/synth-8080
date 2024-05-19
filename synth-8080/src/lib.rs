@@ -1,13 +1,13 @@
 #![feature(exclusive_range_pattern, let_chains)]
 use anyhow::{bail, Result};
 use common::Module;
-use common::ModuleType;
+use lib::ModuleType;
 // pub use lib::{Float, SAMPLE_RATE};
 pub use lib::{Float, SAMPLE_RATE};
 use log::error;
 use output::Audio;
 use rodio::OutputStreamHandle;
-use std::{future::Future, sync::Arc, task::Poll};
+use std::{future::Future, mem::size_of, sync::Arc, task::Poll};
 // use tokio::task::spawn;
 use tracing::*;
 
@@ -28,6 +28,7 @@ pub mod envelope;
 pub mod gain;
 pub mod lfo;
 pub mod mid_pass;
+pub mod midi_osc;
 pub mod osc;
 pub mod output;
 pub mod overdrive;
@@ -52,6 +53,8 @@ impl Future for AudioGen {
 
         let mut src_samples = [[0.0; 16]; u8::MAX as usize];
 
+        // info!("locking controller.modules");
+
         for src in 0..u8::MAX as usize {
             if let Some(mods) = self.controller.modules.lock().unwrap().get_output(src) {
                 // println!("foobar");
@@ -65,6 +68,7 @@ impl Future for AudioGen {
         let mut dest_samples = [[0.0; 16]; u8::MAX as usize];
         let mut destinations: Vec<(u8, u8)> = Vec::with_capacity(256);
 
+        // info!("locking controller.connections");
         for con in self.controller.connections.lock().unwrap().iter() {
             dest_samples[con.dest_module as usize][con.dest_input as usize] +=
                 src_samples[con.src_module as usize][con.src_output as usize];
@@ -76,6 +80,8 @@ impl Future for AudioGen {
             }
         }
 
+        // info!("built destinations");
+
         for (dest_mod, dest_in) in destinations {
             let sample = dest_samples[dest_mod as usize][dest_in as usize];
 
@@ -84,7 +90,7 @@ impl Future for AudioGen {
                     .output
                     .lock()
                     .unwrap()
-                    .recv_samples(0, &vec![sample]);
+                    .recv_samples(dest_in, &vec![sample]);
             } else {
                 self.controller.modules.lock().unwrap().send_sample_to(
                     dest_mod as usize,
@@ -93,6 +99,8 @@ impl Future for AudioGen {
                 );
             }
         }
+
+        // info!("sent samples");
 
         cx.waker().wake_by_ref();
         Poll::Pending
@@ -121,32 +129,36 @@ pub async fn mk_synth() -> Result<(Arc<controller::Controller>, (OutputStreamHan
     // TODO: read config
     let modules = [
         // ModuleType::Output,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        ModuleType::MCO,
         ModuleType::Lfo,
         ModuleType::Echo,
         ModuleType::Chorus,
         ModuleType::Delay, // same as echo
         ModuleType::OverDrive,
         ModuleType::Reverb,
-        ModuleType::Vco,
-        ModuleType::Vco,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
-        ModuleType::EnvFilter,
-        ModuleType::EnvFilter,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
-        ModuleType::Vco,
-        ModuleType::EnvFilter,
+        ModuleType::Lfo,
+        ModuleType::Lfo,
+        ModuleType::Lfo,
+        // ModuleType::Vco,
+        // ModuleType::Vco,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::EnvFilter,
+        // ModuleType::EnvFilter,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
+        // ModuleType::Vco,
+        // ModuleType::EnvFilter,
     ];
 
     // let (raw_ctrlr, _audio_handle) = controller::Controller::new(&modules).await.map_or_else(
@@ -160,9 +172,16 @@ pub async fn mk_synth() -> Result<(Arc<controller::Controller>, (OutputStreamHan
     let ctrlr = Arc::new(raw_ctrlr);
     info!("{} modules made", modules.len());
 
+    info!(
+        "synth started with: {} bit float samples, and a sample rate of {}",
+        size_of::<Float>() * 8,
+        SAMPLE_RATE
+    );
+
     Ok((ctrlr, audio_handle))
 }
 
+// TODO: overhaul this to use MCO instead of VCO
 pub fn default_connections(synth: Arc<controller::Controller>, n: usize) {
     let mods = synth.modules.lock().unwrap();
 

@@ -32,7 +32,9 @@ columns = [
 ]
 
 
-note_offset = 48
+# note_offset = 48
+note_offset = 60
+# note_offset = 72
 # playing = [0] * 12
 playing = []
 

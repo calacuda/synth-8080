@@ -1,2 +1,6 @@
 run:
-  cargo tauri dev
+  cargo tauri dev -f "HiFi"
+
+tailwind:
+  npm list @catppuccin/tailwindcss > /dev/null || npm install -D @catppuccin/tailwindcss
+  npx tailwindcss -i ./input.css -o ./styles.css --watch

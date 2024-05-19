@@ -6,7 +6,7 @@ use crate::{
 use tracing::*;
 
 pub const N_INPUTS: u8 = 3;
-pub const N_OUTPUTS: u8 = 1;
+pub const N_OUTPUTS: u8 = 2;
 
 pub const PITCH_IN: u8 = 0;
 pub const VOL_IN: u8 = 1;
@@ -58,7 +58,7 @@ impl Module for Lfo {
         let sample = self.osc.get_sample() * self.volume_in;
         // info!("lfo => {sample}");
 
-        vec![(0, sample)]
+        vec![(0, sample), (1, sample * -1.0)]
     }
 
     fn recv_samples(&mut self, input_n: u8, samples: &[Float]) {
@@ -67,7 +67,7 @@ impl Module for Lfo {
         } else if input_n == VOL_IN {
             self.volume_in = (samples.iter().sum::<Float>().tanh() + 1.0) * 0.5;
         } else if input_n == OSC_TYPE_IN {
-            error!("can not yet set LFO oscilator type");
+            error!("can not yet set LFO oscillator type");
         } else {
             error!("invalid input: {input_n} for LFO module");
         }

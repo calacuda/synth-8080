@@ -1,7 +1,5 @@
-use crate::{
-    common::{Module, ModuleType},
-    Float,
-};
+use crate::{common::Module, Float};
+use lib::ModuleType;
 use tracing::*;
 
 #[derive(Default)]
@@ -20,8 +18,9 @@ pub struct Modules {
     pub delay: Vec<crate::delay::Delay>,
     pub chorus: Vec<crate::chorus::Chorus>,
     pub over_drive: Vec<crate::overdrive::OverDrive>,
+    pub mco: Vec<crate::midi_osc::MidiOsc>,
     // pub audio_in: Vec<(Vec<Input>, Vec<Output>)>,
-    /// allows for easier indexing into this struct. the index of the items in this Vec corespond
+    /// allows for easier indexing into this struct. the index of the items in this Vec correspond
     /// to the modules ID
     pub indices: Vec<(ModuleType, usize)>,
 }
@@ -45,6 +44,7 @@ impl Modules {
             ModuleType::Delay => self.delay[*i].get_samples(),
             ModuleType::OverDrive => self.over_drive[*i].get_samples(),
             ModuleType::Reverb => self.reverb[*i].get_samples(),
+            ModuleType::MCO => self.mco[*i].get_samples(),
             _ => {
                 error!("{mod_type:?} is not yet in Modules.get_output(...)'s match statement. pls fix that");
                 return None;
@@ -70,6 +70,7 @@ impl Modules {
             ModuleType::Delay => self.delay[i].recv_samples(input as u8, samples),
             ModuleType::OverDrive => self.over_drive[i].recv_samples(input as u8, samples),
             ModuleType::Reverb => self.reverb[i].recv_samples(input as u8, samples),
+            ModuleType::MCO => self.mco[i].recv_samples(input as u8, samples),
             _ => {
                 error!("{mod_type:?} is not yet in Modules.get_output(...)'s match statement. pls fix that");
                 return;
@@ -120,6 +121,10 @@ impl From<&[ModuleType]> for Modules {
             ModuleType::Reverb => {
                 s.reverb.push(crate::reverb::ReverbModule::new());
                 s.indices.push((*mod_type, s.reverb.len() - 1));
+            }
+            ModuleType::MCO => {
+                s.mco.push(crate::midi_osc::MidiOsc::default());
+                s.indices.push((*mod_type, s.mco.len() - 1));
             }
             _ => {
                 error!(

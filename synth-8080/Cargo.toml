@@ -5,8 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = [ "hardware" ] 
+default = [ "hardware", "HiFi" ]
 hardware = [ "dep:serialport" ]
+HiFi = [ "lib/HiFi" ]
 
 [dependencies]
 anyhow = "1.0.79"

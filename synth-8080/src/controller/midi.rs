@@ -69,7 +69,7 @@ impl MIDIControls {
                                 let note = Note::from(u8::from(key));
                                 // if let Ok(note) = Note::from(&key) {
                                 info!("playing {note}");
-                                ctrlr.play(note);
+                                ctrlr.modules.lock().unwrap().mco[0].play_note(note);
                                 // } else {
                                 //     error!("{}", key.to_string());
                                 // }
@@ -79,7 +79,7 @@ impl MIDIControls {
                                 let note = Note::from(u8::from(key));
                                 // if let Ok(note) = Note::from(&key) {
                                 info!("stopping {note}");
-                                ctrlr.stop(note);
+                                ctrlr.modules.lock().unwrap().mco[0].stop_note(note);
                                 // } else {
                                 //     error!("{}", key.to_string());
                                 // }

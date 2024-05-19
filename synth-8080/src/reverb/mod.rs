@@ -12,7 +12,7 @@ pub const DECAY_INPUT: u8 = 2;
 pub struct ReverbModule {
     verb: Reverb,
     audio_in: Float,
-    gain: f32,
+    pub gain: f32,
 }
 
 impl ReverbModule {

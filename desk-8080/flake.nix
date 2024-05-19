@@ -46,8 +46,8 @@
           # # Support the Video Audio (Hardware) Acceleration API
           # gst_all_1.gst-vaapi
           # mesa
-          # nodejs-slim
-          # nodePackages.npm
+          nodejs-slim
+          nodePackages.npm
           websocat
           libudev-zero
           webkitgtk

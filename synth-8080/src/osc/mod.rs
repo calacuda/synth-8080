@@ -18,6 +18,7 @@ pub struct Oscilator {
     pub overtones: bool,
     pub frequency: Float,
     pub bend: Float,
+    pub volume: Float,
 }
 
 impl Oscilator {
@@ -28,6 +29,7 @@ impl Oscilator {
         let overtones = false;
         let frequency = 0.0;
         let bend = bend_range();
+        let volume = 1.0;
 
         Self {
             osc,
@@ -35,6 +37,7 @@ impl Oscilator {
             overtones,
             frequency,
             bend,
+            volume,
         }
     }
 
@@ -44,7 +47,7 @@ impl Oscilator {
     }
 
     pub fn get_sample(&mut self) -> Float {
-        self.osc.get_sample()
+        self.osc.get_sample() * self.volume
     }
 
     pub fn set_waveform(&mut self, waveform: OscType) {
