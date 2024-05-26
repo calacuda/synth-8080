@@ -62,7 +62,7 @@ impl Filter for AllPassFilter {
     }
 
     fn get_sample(&mut self, audio_in: Float) -> Float {
-        let result = self.a1 * audio_in + (self.dn_1 * self.resonance);
+        let result = self.a1 * audio_in + self.dn_1;
         self.dn_1 = audio_in - self.a1 * (result * self.resonance);
         // self.dn_1 = audio_in - self.a1 * result;
 
