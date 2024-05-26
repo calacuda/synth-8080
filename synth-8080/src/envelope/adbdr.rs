@@ -55,7 +55,7 @@ impl Filter {
             attack_speed,
             decay_1_speed,
             decay_2_speed,
-            release: -1.0 / (sample_rate * 0.01),
+            release: -0.9 / (sample_rate * 0.25),
             pressed: false,
             release_threshold: 0.05,
         }
@@ -143,6 +143,7 @@ impl Envelope for Filter {
         } else if self.phase == Phase::Neutural && sample >= 0.75 {
             // info!("pressed");
             self.phase = Phase::Attack;
+            self.release = -self.env / (self.sample_rate * 0.01);
             self.pressed = true;
         }
 

@@ -1,6 +1,6 @@
 use crate::{
     common::{bend_range, notes::Note, Module},
-    osc::{OscType, Oscilator},
+    osc::{OscType, Oscillator},
     Float,
 };
 use std::sync::Arc;
@@ -13,27 +13,28 @@ pub const PITCH_INPUT: u8 = 1;
 pub const PITCH_BEND_INPUT: u8 = 2;
 
 pub struct Vco {
-    /// stores the current oscilator type (probably not nessesary)
+    /// stores the current oscillator type (probably not necessary)
     pub osc_type: OscType,
-    /// the oscilator that produces samples
-    pub osc: Oscilator,
+    /// the oscillator that produces samples
+    pub osc: Oscillator,
     /// where the data from the volume input is stored
     pub volume_in: Float,
     /// the note to be played
     pub pitch_in: Float,
-    /// wether the oscilator should produce over tones.
+    /// whether the oscillator should produce over tones.
     pub overtones: bool,
     pub note: Note,
     /// how much to bend the pitch when pitch bends happen
     pub bend_amt: Arc<Float>,
-    /// the id of this module, must corespond to its index in the routing table
+    /// the id of this module, must correspond to its index in the routing table
     pub id: u8,
 }
 
 impl Vco {
     pub fn new(id: u8) -> Self {
         let osc_type = OscType::Sine;
-        let osc = Oscilator::new();
+        let osc = Oscillator::new();
+        // trace!("made an oscillator");
         let volume_in = 1.0;
         let pitch_in = 0.0;
         let overtones = false;
@@ -66,8 +67,7 @@ impl Vco {
 
     pub fn set_overtones(&mut self, on: bool) {
         self.overtones = on;
-
-        // info!("overtones on: {on}")
+        self.osc.enable_overtones(on);
     }
 
     pub fn set_note(&mut self, note: Note) {
@@ -95,5 +95,13 @@ impl Module for Vco {
         } else {
             error!("invalid input: {input_n} for VCO module");
         }
+    }
+
+    fn get_input_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Vol.", "Pitch", "Bend"].iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio Out"].iter()
     }
 }

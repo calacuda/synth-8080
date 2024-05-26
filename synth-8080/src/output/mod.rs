@@ -72,7 +72,8 @@ impl Output {
         ext_sync.send(()).unwrap();
         let audio = Audio::new(ext_sync, rx);
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-        info!("playing audio struct");
+        // info!("playing audio struct");
+        info!("returning audio struct");
 
         (
             Self {
@@ -89,6 +90,10 @@ impl Output {
             (stream_handle, audio),
         )
     }
+
+    pub fn set_volume(&mut self, volume: Float) {
+        self.volume = volume;
+    }
 }
 
 impl Module for Output {
@@ -104,6 +109,14 @@ impl Module for Output {
         if let Err(e) = self.int_sync.send(self.sample) {
             error!("could not send sample to Audio struct. got error: {e}");
         };
+    }
+
+    fn get_input_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio In"].iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio Out"].iter()
     }
 }
 

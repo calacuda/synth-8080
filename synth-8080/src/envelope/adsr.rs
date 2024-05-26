@@ -2,6 +2,8 @@ use super::Envelope;
 use crate::{Float, SAMPLE_RATE};
 use anyhow::{bail, Result};
 
+// use tracing::*;
+
 pub const N_INPUTS: u8 = 5;
 pub const N_OUTPUTS: u8 = 1;
 
@@ -52,7 +54,7 @@ impl Filter {
             sample_rate,
             attack_speed,
             decay_speed,
-            release: -1.0 / (sample_rate * 0.01),
+            release: -0.9 / (sample_rate * 0.1),
             pressed: false,
             release_threshold: 0.05,
         }
@@ -68,29 +70,30 @@ impl Filter {
     fn set_decay(&mut self, decay_speed: Float) {
         if decay_speed != self.decay_speed {
             self.decay_speed = decay_speed;
-            self.decay = -(1.0 - self.threshold) / (self.sample_rate * decay_speed);
+            self.decay = -1.0 / (self.sample_rate * decay_speed);
         }
     }
 
     fn set_threshold(&mut self, threshold: Float) {
         self.threshold = threshold;
+        self.release = -threshold / (self.sample_rate * 0.01);
     }
 
     fn internal_update_phase(&mut self) {
         if self.phase == Phase::Attack && self.env >= 1.0 {
             self.phase = Phase::Decay;
             self.env = 1.0;
-            // info!("chaning phase to => {:?}", self.phase);
+            // info!("changing phase to => {:?}", self.phase);
         } else if self.phase == Phase::Decay && self.env <= self.threshold {
             self.phase = Phase::Sustain;
-            // info!("chaning phase to => {:?}", self.phase);
-        } else if self.phase == Phase::Sustain && self.env <= self.release_threshold {
-            self.phase = Phase::Release;
-            // info!("chaning phase to => {:?}", self.phase);
+            // info!("changing phase to => {:?}", self.phase);
+            // } else if self.phase == Phase::Sustain && self.env <= self.release_threshold {
+            //     self.phase = Phase::Release;
+            // info!("changing phase to => {:?}", self.phase);
         } else if self.phase == Phase::Release && self.env <= 0.0 {
             self.phase = Phase::Neutural;
             self.env = 0.0;
-            // info!("chaning phase to => {:?}", self.phase);
+            // info!("changing phase to => {:?}", self.phase);
         }
     }
 }
@@ -125,7 +128,10 @@ impl Envelope for Filter {
             // info!("release");
             self.phase = Phase::Release;
             self.pressed = false;
-        } else if !self.pressed && self.phase == Phase::Neutural && sample >= 0.75 {
+        } else if !self.pressed
+            && (self.phase == Phase::Neutural || self.phase == Phase::Release)
+            && sample >= 0.75
+        {
             // info!("pressed");
             self.phase = Phase::Attack;
             self.pressed = true;
@@ -152,5 +158,6 @@ impl Envelope for Filter {
 
     fn pressed(&mut self) -> bool {
         self.phase != Phase::Neutural
+        // self.pressed
     }
 }

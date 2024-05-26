@@ -31,6 +31,7 @@ impl Controller {
         let (tx, sync) = unbounded();
         let (output, jh) = output::Output::new(tx);
         let modules = Mutex::new(Modules::from(to_build));
+        debug!("modules have been made, constructing Controller struct");
 
         Ok((
             Self {

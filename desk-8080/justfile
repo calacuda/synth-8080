@@ -1,5 +1,14 @@
 run:
-  cargo tauri dev -f "HiFi"
+  cargo tauri dev -f "HiFi" --release
+
+dev:
+  cargo tauri dev
+
+release:
+  cargo tauri dev --release
+
+build:
+  cargo tauri build -f "HiFi"
 
 tailwind:
   npm list @catppuccin/tailwindcss > /dev/null || npm install -D @catppuccin/tailwindcss

@@ -69,14 +69,26 @@ struct EditConnectionArgs {
     dest_mod: (ModuleType, usize, u8),
 }
 
+#[derive(Serialize, Deserialize)]
+struct PolyphonySetArgs {
+    n: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SetOvertonesArgs {
+    enabled: bool,
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     // TODO: add a button to scan for midi devices and choose which vco to connect them to.
 
     view! {
         <main class="p-4">
-            <div class="grid grid-cols-3 gap-4">
-                <LFOs/>
+            <div class="grid grid-cols-4 gap-4">
+                <div class="col-span-2">
+                    <LFOs/>
+                </div>
 
                 <div class="col-span-2 gap-4">
                     <div class="gap-4 col-start-1 col-end-2">
@@ -113,8 +125,8 @@ fn Slider(on_input: Box<dyn FnMut(Event)>) -> impl IntoView {
         <input
             type="range"
             min="1"
-            max="100"
-            value="50"
+            max="10000"
+            value="5000"
             on:input=on_input
         />
     }
@@ -192,16 +204,6 @@ fn LFO(index: u8) -> impl IntoView {
                         children=move |osc| {
                             view! {
                                 <div>
-                                    {
-                                        if osc == lfo_type.get() {
-                                            // view! {
-                                                // <div> " -> " </div>
-                                            // }
-                                            " -> "
-                                        } else {
-                                            ""
-                                        }
-                                    }
                                     <button on:click=move |_| {
                                         spawn_local(async move {
                                             invoke(
@@ -212,7 +214,13 @@ fn LFO(index: u8) -> impl IntoView {
                                             set_lfo_type.set(osc);
                                         })
                                     }>
-                                        { move || format!("{osc:?}")  }
+                                        { move ||
+                                            if osc == lfo_type.get() {
+                                                format!("- [x] {osc:?}")
+                                            } else {
+                                                format!("- [ ] {osc:?}")
+                                            }
+                                        }
                                     </button>
                                 </div>
                             }
@@ -243,6 +251,7 @@ fn LFOs() -> impl IntoView {
 fn VCO() -> impl IntoView {
     // make signal for LFO state
     let (vco_type, set_vco_type) = create_signal(OscType::Sine);
+    let (overtones, set_overtones) = create_signal(true);
 
     spawn_local(async move {
         set_vco_type.set(
@@ -270,15 +279,64 @@ fn VCO() -> impl IntoView {
         })
     };
 
+    let on_overtones_click = move |_ev| {
+        set_overtones.set(!overtones.get());
+
+        spawn_local(async move {
+            invoke(
+                "enable_overtones",
+                to_value(&SetOvertonesArgs {
+                    enabled: overtones.get(),
+                })
+                .unwrap(),
+            )
+            .await;
+        })
+    };
+
     view! {
         <div class="text-center">
             <h1> MCO </h1>
 
             <div class="border-4 rounded-md border-black text-center grid grid-cols-2">
                 <div>
-                    <p> "vol." </p>
-                    <Slider on_input=Box::new(on_volume_input)/>
+                    <div>
+                        <p> "vol." </p>
+                        <Slider on_input=Box::new(on_volume_input)/>
+                    </div>
+                    <div>
+                        "Polyphony: "
+                        <input type="number" id="src_mod_index" name="src_mod_index"
+                            on:change=move |ev| {
+                                // set_src_mod_index.set(event_target_value(&ev).parse().unwrap_or(0))
+                                spawn_local(async move {
+                                    invoke(
+                                        "set_polyphony",
+                                        to_value(&PolyphonySetArgs { n: event_target_value(&ev).parse().unwrap_or(4) }).unwrap(),
+                                    )
+                                    .await;
+                                })
+
+                            }
+                            min="1"
+                            max="10"
+                            value="4"
+                        />
+                    </div>
+                    <div>
+                        <button on:click=on_overtones_click>
+                            { move || {
+                                if overtones.get() {
+                                    "[x] "
+                                } else {
+                                    "[ ] "
+                                }}
+                            }
+                            Overtones
+                        </button>
+                    </div>
                 </div>
+
                 // oscillator type indicator
                 <div class="grid grid-flex-row">
                     <For
@@ -287,16 +345,6 @@ fn VCO() -> impl IntoView {
                         children=move |osc| {
                             view! {
                                 <div>
-                                    {
-                                        if osc == vco_type.get() {
-                                            // view! {
-                                                // <div> " -> " </div>
-                                            // }
-                                            " -> "
-                                        } else {
-                                            ""
-                                        }
-                                    }
                                     <button on:click=move |_| {
                                         spawn_local(async move {
                                             invoke(
@@ -307,7 +355,13 @@ fn VCO() -> impl IntoView {
                                             set_vco_type.set(osc);
                                         })
                                     }>
-                                        { move || format!("{osc:?}")  }
+                                        { move ||
+                                            if osc == vco_type.get() {
+                                                format!("- [x] {osc:?}")
+                                            } else {
+                                                format!("- [ ] {osc:?}")
+                                            }
+                                        }
                                     </button>
                                 </div>
                             }
@@ -321,7 +375,7 @@ fn VCO() -> impl IntoView {
 
 #[component]
 fn EnvFilter() -> impl IntoView {
-    let (env_type, set_env_type) = create_signal(FilterType::OC);
+    let (env_type, set_env_type) = create_signal(FilterType::ADSR);
 
     spawn_local(async move {
         set_env_type.set(
@@ -329,10 +383,10 @@ fn EnvFilter() -> impl IntoView {
                 invoke("get_vco_env", to_value(&Empty {}).unwrap())
                     .await
                     .as_string()
-                    .unwrap_or("AD".to_string())
+                    .unwrap_or("ADSR".to_string())
                     .as_str(),
             )
-            .unwrap_or(FilterType::AD),
+            .unwrap_or(FilterType::ADSR),
         )
     });
 
@@ -357,14 +411,14 @@ fn EnvFilter() -> impl IntoView {
             })
         };
 
-        if env_type.get() != FilterType::OC {
-            view! {
-                <p> "attack" </p>
-                <Slider on_input=Box::new(set_attack)/>
-            }
-        } else {
-            nothing()
+        // if env_type.get() != FilterType::OC {
+        view! {
+            <p> "attack" </p>
+            <Slider on_input=Box::new(set_attack)/>
         }
+        // } else {
+        //     nothing()
+        // }
     };
 
     let decay = move || {
@@ -381,14 +435,14 @@ fn EnvFilter() -> impl IntoView {
             })
         };
 
-        if env_type.get() != FilterType::OC {
-            view! {
-                <p> "decay" </p>
-                <Slider on_input=Box::new(set_decay)/>
-            }
-        } else {
-            nothing()
+        // if env_type.get() != FilterType::OC {
+        view! {
+            <p> "decay" </p>
+            <Slider on_input=Box::new(set_decay)/>
         }
+        // } else {
+        //     nothing()
+        // }
     };
 
     let sustain = move || {
@@ -415,11 +469,59 @@ fn EnvFilter() -> impl IntoView {
         }
     };
 
-    let display_break = move || {
-        let set_break = move |ev| {
+    // let display_break = move || {
+    //     let set_break = move |ev| {
+    //         spawn_local(async move {
+    //             invoke(
+    //                 "set_env_break",
+    //                 to_value(&EnvSetArgs {
+    //                     value: event_target_value(&ev).parse().unwrap(),
+    //                 })
+    //                 .unwrap(),
+    //             )
+    //             .await;
+    //         })
+    //     };
+    //
+    //     if env_type.get() == FilterType::ADBDR {
+    //         view! {
+    //             <p> "break" </p>
+    //             <Slider on_input=Box::new(set_break)/>
+    //         }
+    //     } else {
+    //         nothing()
+    //     }
+    // };
+
+    // let decay_2 = move || {
+    //     let set_decay = move |ev| {
+    //         spawn_local(async move {
+    //             invoke(
+    //                 "set_env_decay_2",
+    //                 to_value(&EnvSetArgs {
+    //                     value: event_target_value(&ev).parse().unwrap(),
+    //                 })
+    //                 .unwrap(),
+    //             )
+    //             .await;
+    //         })
+    //     };
+    //
+    //     if env_type.get() == FilterType::ADBDR {
+    //         view! {
+    //             <p> "decay 2" </p>
+    //             <Slider on_input=Box::new(set_decay)/>
+    //         }
+    //     } else {
+    //         nothing()
+    //     }
+    // };
+
+    let cutoff = move || {
+        let set_cutoff = move |ev| {
             spawn_local(async move {
                 invoke(
-                    "set_env_break",
+                    "set_env_cutoff",
                     to_value(&EnvSetArgs {
                         value: event_target_value(&ev).parse().unwrap(),
                     })
@@ -429,21 +531,17 @@ fn EnvFilter() -> impl IntoView {
             })
         };
 
-        if env_type.get() == FilterType::ADBDR {
-            view! {
-                <p> "break" </p>
-                <Slider on_input=Box::new(set_break)/>
-            }
-        } else {
-            nothing()
+        view! {
+            <p> "cutoff" </p>
+            <Slider on_input=Box::new(set_cutoff)/>
         }
     };
 
-    let decay_2 = move || {
-        let set_decay = move |ev| {
+    let resonance = move || {
+        let set_resonance = move |ev| {
             spawn_local(async move {
                 invoke(
-                    "set_env_decay_2",
+                    "set_env_resonance",
                     to_value(&EnvSetArgs {
                         value: event_target_value(&ev).parse().unwrap(),
                     })
@@ -453,62 +551,56 @@ fn EnvFilter() -> impl IntoView {
             })
         };
 
-        if env_type.get() == FilterType::ADBDR {
-            view! {
-                <p> "decay 2" </p>
-                <Slider on_input=Box::new(set_decay)/>
-            }
-        } else {
-            nothing()
+        view! {
+            <p> "resonance" </p>
+            <Slider on_input=Box::new(set_resonance)/>
         }
     };
 
     view! {
         <div class="text-center">
             <h1> { move || format!("{:?}", env_type.get()) } </h1>
-            <div class="border-4 rounded-md border-black text-center grid grid-flow-col">
+            <div class="border-4 rounded-md border-black text-center">
                 <div>
                     { attack }
                     { decay }
                     { sustain }
-                    { display_break }
-                    { decay_2 }
+                    // { display_break }
+                    // { decay_2 }
+                    { cutoff }
+                    { resonance }
                 </div>
 
-                <div>
-                    <For
-                        each=move || FilterType::iter()
-                        key=move |key| (key.clone(), *key == env_type.get())
-                        children=move |env| {
-                            view! {
-                                <div>
-                                    {
-                                        if env == env_type.get() {
-                                            // view! {
-                                                // <div> " -> " </div>
-                                            // }
-                                            " -> "
-                                        } else {
-                                            ""
-                                        }
-                                    }
-                                    <button on:click=move |_| {
-                                        spawn_local(async move {
-                                            invoke(
-                                                "set_env",
-                                                to_value(&VcoSetEnvType { env_type: env }).unwrap(),
-                                            )
-                                            .await;
-                                            set_env_type.set(env);
-                                        })
-                                    }>
-                                        { move || format!("{env:?}")  }
-                                    </button>
-                                </div>
-                            }
-                        }
-                    />
-                </div>
+                // <div>
+                    // <For
+                    //     each=move || FilterType::iter()
+                    //     key=move |key| (key.clone(), *key == env_type.get())
+                    //     children=move |env| {
+                    //         view! {
+                    //             <div>
+                    //                 <button on:click=move |_| {
+                    //                     spawn_local(async move {
+                    //                         invoke(
+                    //                             "set_env",
+                    //                             to_value(&VcoSetEnvType { env_type: env }).unwrap(),
+                    //                         )
+                    //                         .await;
+                    //                         set_env_type.set(env);
+                    //                     })
+                    //                 }>
+                    //                     { move ||
+                    //                         if env == env_type.get() {
+                    //                             format!("- [x] {env:?}")
+                    //                         } else {
+                    //                             format!("- [ ] {env:?}")
+                    //                         }
+                    //                     }
+                    //                 </button>
+                    //             </div>
+                    //         }
+                    //     }
+                    // />
+                // </div>
             </div>
         </div>
     }
@@ -711,6 +803,15 @@ fn Connections() -> impl IntoView {
     let (dest_mod_index, set_dest_mod_index) = create_signal::<usize>(0);
     let (dest_mod_output, set_dest_mod_input) = create_signal::<u8>(0);
 
+    // let (svg_src, set_svg_src) = create_signal(String::new());
+
+    // spawn_local(async move {
+    //     set_svg_src.set(
+    //         from_value(invoke("get_connection_graph", to_value(&Empty {}).unwrap()).await)
+    //             .unwrap_or(String::new()),
+    //     )
+    // });
+
     let connect = move |_| {
         if let (Some(src_mod), Some(dest_mod)) = (src_mod_type.get(), dest_mod_type.get()) {
             spawn_local(async move {
@@ -739,6 +840,14 @@ fn Connections() -> impl IntoView {
         }
     };
 
+    let re_con = move |_| {
+        console_log("reconnecting to MIDI Keyboard");
+
+        spawn_local(async move {
+            invoke("reconnect_midi", to_value(&Empty {}).unwrap()).await;
+        });
+    };
+
     view! {
         <div class="grid grid-cols-2 text-center p-4 gap-4">
             // create connection box
@@ -758,8 +867,14 @@ fn Connections() -> impl IntoView {
                                         view! {
                                             <div>
                                                 <button
-                                                    on:click=move |_| set_src_mod_type.set(Some(module))
-                                                > { if src_mod_type.get() == Some(module) { format!("-> {module:?}") } else { format!("{module:?}") } } </button>
+                                                    on:click=move |_| {
+                                                        if src_mod_type.get() == Some(module) {
+                                                            set_src_mod_type.set(None);
+                                                        } else {
+                                                            set_src_mod_type.set(Some(module))
+                                                        }
+                                                    }
+                                                > { if src_mod_type.get() == Some(module) { format!("- [x] {module}") } else { format!("- [ ] {module}") } } </button>
                                             </div>
                                         }
                                     }
@@ -824,13 +939,19 @@ fn Connections() -> impl IntoView {
                             <legend>Module Type:</legend>
                             <For
                                 each=move || ModuleType::iter()
-                                key = move |module| (module.clone(), Some(*module) == src_mod_type.get())
+                                key = move |module| (module.clone(), Some(*module) == dest_mod_type.get())
                                 children=move |module| {
                                     view! {
                                         <div>
                                             <button
-                                                on:click=move |_| set_dest_mod_type.set(Some(module))
-                                            > { if dest_mod_type.get() == Some(module) { format!("-> {module:?}") } else { format!("{module:?}") } } </button>
+                                                on:click=move |_| {
+                                                    if dest_mod_type.get() == Some(module) {
+                                                        set_dest_mod_type.set(None)
+                                                    } else {
+                                                        set_dest_mod_type.set(Some(module))
+                                                    }
+                                                }
+                                            > { if dest_mod_type.get() == Some(module) { format!("- [x] {module}") } else { format!("- [ ] {module}") } } </button>
                                         </div>
                                     }
                                 }
@@ -894,6 +1015,7 @@ fn Connections() -> impl IntoView {
             </div>
             // what's connected box
             <div>
+                <button on:click=re_con> Reconnect Midi </button>
                 <h1> Connected </h1>
                 <div class="border-4 rounded-md border-black justify-center text-center grid grid-cols-4 text-wrap">
                     // <For
@@ -939,6 +1061,10 @@ fn Connections() -> impl IntoView {
                         }).collect::<Vec<_>>()
                     }
                 </div>
+                // <div class="border-4 rounded-md border-black justify-center text-center grid grid-cols-4 text-wrap">
+                //     <h1> Graph </h1>
+                //     <svg src=svg_src> </svg>
+                // </div>
             </div>
         </div>
     }

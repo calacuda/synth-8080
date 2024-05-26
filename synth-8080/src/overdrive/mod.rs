@@ -34,9 +34,17 @@ impl Module for OverDrive {
         if input_n == AUDIO_INPUT {
             self.audio_in = sample;
         } else if input_n == GAIN_INPUT {
-            self.gain = (sample + 1.1).powi(2);
+            self.gain = (sample + 1.1).powi(4);
         } else {
             error!("invalid input designation: {input_n} for the OverDrive Modules.");
         }
+    }
+
+    fn get_input_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio In", "Gain"].iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio Out"].iter()
     }
 }

@@ -87,4 +87,12 @@ impl Module for Echo {
             error!("invalid input for echo module: {input_n}");
         }
     }
+
+    fn get_input_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio In", "Speed", "Vol."].iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio Out"].iter()
+    }
 }

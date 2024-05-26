@@ -49,4 +49,12 @@ impl Module for ReverbModule {
             error!("invalid input: {input_n}, to reverb");
         }
     }
+
+    fn get_input_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio In", "Gain", "Decay"].iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Audio Out"].iter()
+    }
 }

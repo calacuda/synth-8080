@@ -2,19 +2,13 @@
 use anyhow::{bail, Result};
 use common::Module;
 use lib::ModuleType;
-// pub use lib::{Float, SAMPLE_RATE};
 pub use lib::{Float, SAMPLE_RATE};
 use log::error;
 use output::Audio;
 use rodio::OutputStreamHandle;
 use std::{future::Future, mem::size_of, sync::Arc, task::Poll};
-// use tokio::task::spawn;
-use tracing::*;
-
-// #[cfg(feature("hardware"))]
 pub use tokio::spawn;
-
-// #[cfg(feature("hardware"))]
+use tracing::*;
 
 pub type JoinHandle = tokio::task::JoinHandle<()>;
 
@@ -125,44 +119,30 @@ pub fn start_logging() -> Result<()> {
     Ok(())
 }
 
-pub async fn mk_synth() -> Result<(Arc<controller::Controller>, (OutputStreamHandle, Audio))> {
-    // TODO: read config
-    let modules = [
+pub fn default_modules() -> Vec<ModuleType> {
+    [
         // ModuleType::Output,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
         ModuleType::MCO,
         ModuleType::Lfo,
         ModuleType::Echo,
         ModuleType::Chorus,
-        ModuleType::Delay, // same as echo
+        ModuleType::Delay,
         ModuleType::OverDrive,
         ModuleType::Reverb,
         ModuleType::Lfo,
         ModuleType::Lfo,
         ModuleType::Lfo,
-        // ModuleType::Vco,
-        // ModuleType::Vco,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::EnvFilter,
-        // ModuleType::EnvFilter,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-        // ModuleType::Vco,
-        // ModuleType::EnvFilter,
-    ];
+    ]
+    .to_vec()
+}
+
+pub async fn mk_synth(
+    modules: &[ModuleType],
+) -> Result<(Arc<controller::Controller>, (OutputStreamHandle, Audio))> {
+    // TODO: read config
 
     // let (raw_ctrlr, _audio_handle) = controller::Controller::new(&modules).await.map_or_else(
-    let (raw_ctrlr, audio_handle) = controller::Controller::new(&modules).await.map_or_else(
+    let (raw_ctrlr, audio_handle) = controller::Controller::new(modules).await.map_or_else(
         |e| {
             error!("{e}");
             bail!(e);

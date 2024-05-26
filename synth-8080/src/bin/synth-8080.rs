@@ -1,12 +1,13 @@
 #![feature(exclusive_range_pattern, let_chains)]
-use anyhow::Result;
+use anyhow::{bail, Result};
 use tokio::spawn;
 use tracing::*;
 
 #[cfg(feature = "hardware")]
 use synth_8080::controller::hardware::HardwareControls;
 use synth_8080::{
-    self, chorus, controller::midi::MIDIControls, envelope, mk_synth, start_logging, vco, AudioGen,
+    self, chorus, controller::midi::MIDIControls, default_modules, envelope, mk_synth,
+    start_logging, vco, AudioGen,
 };
 
 // pub type Float = f32;
@@ -186,7 +187,7 @@ use synth_8080::{
 //     };
 //
 //     let audio_out_thread = spawn(audio);
-//     controller::harware::HardwareControls::new(ctrlr.clone())?.await;
+//     controller::hardware::HardwareControls::new(ctrlr.clone())?.await;
 //
 //     // join!(synth_handle, hardware_handle, audio_handle);
 //     // sleep(Duration::from_secs(2)).await;
@@ -212,7 +213,8 @@ pub async fn main() -> Result<()> {
 
     info!("synth begin");
 
-    let (ctrlr, (stream_handle, audio_struct)) = mk_synth().await?;
+    let (ctrlr, (stream_handle, audio_struct)) = mk_synth(&default_modules()).await?;
+    // stream_handle.play_raw(audio_struct).unwrap();
 
     // info!("about to start rodio thread...");
     // let _rodio_thread = spawn(async move {
@@ -221,7 +223,7 @@ pub async fn main() -> Result<()> {
     //     warn!("_rodio_thread stopped");
     // });
     // info!("rodio thread started.");
-    stream_handle.play_raw(audio_struct).unwrap();
+    // stream_handle.play_raw(audio_struct).unwrap();
 
     // TODO: test changing envelopes
 
@@ -269,31 +271,46 @@ pub async fn main() -> Result<()> {
     // ctrlr.connect(2, 0, 8, reverb::AUDIO_INPUT)?;
     // connect reverb to output
     // ctrlr.connect(8, 0, 0, 0)?;
-    _ = ctrlr.connect(1, 0, 4, chorus::AUDIO_INPUT);
-    _ = ctrlr.connect(4, 0, 0, 0);
+    // _ = ctrlr.connect(1, 0, 4, chorus::AUDIO_INPUT);
+    // _ = ctrlr.connect(4, 0, 0, 0);
 
-    let audio = AudioGen {
+    _ = ctrlr.connect(1, 0, 0, 0);
+
+    {
+        ctrlr.output.lock().unwrap().set_volume(0.5);
+    }
+
+    let audio_gen = AudioGen {
         controller: ctrlr.clone(),
     };
 
-    let midi_con = MIDIControls::new(ctrlr.clone());
+    // let mut midi_con = MIDIControls::new(ctrlr.clone());
 
-    if let Err(e) = midi_con {
-        error!("No MIDI for you! {e}");
-    } else {
-        info!("MIDI started");
-    }
+    let midi_con = match MIDIControls::new(ctrlr.clone()) {
+        Err(e) => {
+            error!("No MIDI for you! {e}");
+            bail!("No MIDI for you! {e}");
+        }
+        Ok(mut midi_con) => {
+            midi_con.connect_default()?;
+            info!("MIDI started");
+            midi_con
+        }
+    };
+
+    stream_handle.play_raw(audio_struct)?;
+    info!("playing audio struct");
 
     #[cfg(feature = "hardware")]
-    {
-        let audio_out_thread = spawn(audio);
+    let audio_out_thread = {
+        let audio_out_thread = spawn(audio_gen);
+        // #[cfg(feature = "hardware")]
         HardwareControls::new(ctrlr.clone())?.await;
-    }
+        audio_out_thread
+    };
 
     #[cfg(not(feature = "hardware"))]
-    {
-        audio.await;
-    }
+    audio_gen.await;
 
     // join!(synth_handle, hardware_handle, audio_handle);
     // sleep(Duration::from_secs(2)).await;

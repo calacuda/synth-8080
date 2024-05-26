@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::Float;
 pub use lib::notes;
 use lib::ModuleType;
@@ -36,6 +38,12 @@ pub trait Module {
 
     /// produces a sample from all outputs
     fn get_samples(&mut self) -> Vec<(u8, Float)>;
+
+    /// returns the names of the inputs in order
+    fn get_input_names() -> impl Iterator<Item = impl Display>;
+
+    /// returns the names of the outputs in order
+    fn get_output_names() -> impl Iterator<Item = impl Display>;
 }
 
 pub fn bend_range() -> Float {

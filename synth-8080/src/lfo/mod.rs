@@ -1,6 +1,6 @@
 use crate::{
     common::Module,
-    osc::{OscType, Oscilator},
+    osc::{OscType, Oscillator},
     Float,
 };
 use tracing::*;
@@ -15,8 +15,8 @@ pub const OSC_TYPE_IN: u8 = 2;
 pub struct Lfo {
     // pub routing_table: Router,
     pub osc_type: OscType,
-    /// the oscilator that produces samples
-    pub osc: Oscilator,
+    /// the oscillator that produces samples
+    pub osc: Oscillator,
     /// where the data from the volume input is stored
     pub volume_in: Float,
     pub id: u8,
@@ -25,7 +25,7 @@ pub struct Lfo {
 impl Lfo {
     pub fn new(id: u8) -> Self {
         let osc_type = OscType::Sine;
-        let mut osc = Oscilator::new();
+        let mut osc = Oscillator::new();
         let volume_in = 0.5;
 
         // DEBUG
@@ -67,9 +67,17 @@ impl Module for Lfo {
         } else if input_n == VOL_IN {
             self.volume_in = (samples.iter().sum::<Float>().tanh() + 1.0) * 0.5;
         } else if input_n == OSC_TYPE_IN {
-            error!("can not yet set LFO oscillator type");
+            error!("can not yet set LFO oscillator type via input");
         } else {
             error!("invalid input: {input_n} for LFO module");
         }
+    }
+
+    fn get_input_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Pitch", "Vol."].iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        ["Out", "Inverse Out"].iter()
     }
 }

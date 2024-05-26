@@ -85,51 +85,54 @@ impl From<&[ModuleType]> for Modules {
     fn from(iter: &[ModuleType]) -> Self {
         let mut s = Self::default();
 
-        iter.into_iter().for_each(|mod_type| match mod_type {
-            ModuleType::Vco => {
-                s.vco.push(crate::vco::Vco::new((s.indices.len()) as u8));
-                s.indices.push((*mod_type, s.vco.len() - 1));
-            }
-            ModuleType::Lfo => {
-                s.lfo.push(crate::lfo::Lfo::new((s.indices.len()) as u8));
-                s.indices.push((*mod_type, s.lfo.len() - 1));
-            }
-            ModuleType::EnvFilter => {
-                s.filter.push(crate::envelope::EnvelopeFilter::new(
-                    (s.indices.len() - 1) as u8,
-                ));
-                s.indices.push((*mod_type, s.filter.len() - 1));
-            }
-            ModuleType::Echo => {
-                s.echo.push(crate::echo::Echo::new((s.indices.len()) as u8));
-                s.indices.push((*mod_type, s.echo.len() - 1));
-            }
-            ModuleType::Chorus => {
-                s.chorus
-                    .push(crate::chorus::Chorus::new((s.indices.len()) as u8));
-                s.indices.push((*mod_type, s.chorus.len() - 1));
-            }
-            ModuleType::Delay => {
-                s.delay
-                    .push(crate::delay::Delay::new((s.indices.len()) as u8));
-                s.indices.push((*mod_type, s.delay.len() - 1));
-            }
-            ModuleType::OverDrive => {
-                s.over_drive.push(crate::overdrive::OverDrive::new());
-                s.indices.push((*mod_type, s.over_drive.len() - 1));
-            }
-            ModuleType::Reverb => {
-                s.reverb.push(crate::reverb::ReverbModule::new());
-                s.indices.push((*mod_type, s.reverb.len() - 1));
-            }
-            ModuleType::MCO => {
-                s.mco.push(crate::midi_osc::MidiOsc::default());
-                s.indices.push((*mod_type, s.mco.len() - 1));
-            }
-            _ => {
-                error!(
-                    "{mod_type:?} is not yet in Modules.from(...)'s match statement. pls fix that"
-                );
+        iter.into_iter().for_each(|mod_type| {
+            // trace!("making a {mod_type:?} module");
+            match mod_type {
+                ModuleType::Vco => {
+                    s.vco.push(crate::vco::Vco::new((s.indices.len()) as u8));
+                    s.indices.push((*mod_type, s.vco.len() - 1));
+                }
+                ModuleType::Lfo => {
+                    s.lfo.push(crate::lfo::Lfo::new((s.indices.len()) as u8));
+                    s.indices.push((*mod_type, s.lfo.len() - 1));
+                }
+                ModuleType::EnvFilter => {
+                    s.filter.push(crate::envelope::EnvelopeFilter::new(
+                        (s.indices.len() - 1) as u8,
+                    ));
+                    s.indices.push((*mod_type, s.filter.len() - 1));
+                }
+                ModuleType::Echo => {
+                    s.echo.push(crate::echo::Echo::new((s.indices.len()) as u8));
+                    s.indices.push((*mod_type, s.echo.len() - 1));
+                }
+                ModuleType::Chorus => {
+                    s.chorus
+                        .push(crate::chorus::Chorus::new((s.indices.len()) as u8));
+                    s.indices.push((*mod_type, s.chorus.len() - 1));
+                }
+                ModuleType::Delay => {
+                    s.delay
+                        .push(crate::delay::Delay::new((s.indices.len()) as u8));
+                    s.indices.push((*mod_type, s.delay.len() - 1));
+                }
+                ModuleType::OverDrive => {
+                    s.over_drive.push(crate::overdrive::OverDrive::new());
+                    s.indices.push((*mod_type, s.over_drive.len() - 1));
+                }
+                ModuleType::Reverb => {
+                    s.reverb.push(crate::reverb::ReverbModule::new());
+                    s.indices.push((*mod_type, s.reverb.len() - 1));
+                }
+                ModuleType::MCO => {
+                    s.mco.push(crate::midi_osc::MidiOsc::default());
+                    s.indices.push((*mod_type, s.mco.len() - 1));
+                }
+                _ => {
+                    error!(
+                        "{mod_type:?} is not yet in Modules.from(...)'s match statement. pls fix that"
+                    );
+                }
             }
         });
 

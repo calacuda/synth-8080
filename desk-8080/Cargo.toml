@@ -6,6 +6,8 @@ edition = "2021"
 [features]
 default = [ "HiFi" ]
 HiFi = [ "synth-8080-lib/HiFi" ]
+double_float = [ "synth-8080-lib/double_float" ]
+wav_sample_rate = [ "synth-8080-lib/HiFi" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
@@ -22,3 +24,10 @@ tauri-sys = { git = "https://github.com/JonasKruckenberg/tauri-sys", version = "
 
 [workspace]
 members = ["src-tauri"]
+
+[profile.dev]
+incremental = true
+opt-level = 3
+
+[profile.release]
+incremental = true

@@ -1,38 +1,40 @@
-// use crate::
-
 use crate::{
     common::Module,
-    envelope::{self, adbdr, adsr, EnvelopeFilter, FILTER_OPEN_IN},
-    vco::{self, Vco},
+    envelope::{self, adbdr, adsr, EnvelopeFilter, Filter, FILTER_OPEN_IN},
+    vco::{self, Vco, PITCH_BEND_INPUT},
 };
 use anyhow::{bail, Result};
 use lib::{notes::Note, FilterType, Float, OscType};
 use std::ops::IndexMut;
 use tracing::*;
 
-pub const N_INPUTS: u8 = 9;
-pub const PITCH_BEND: u8 = 8;
-pub const VOLUME: u8 = 7;
+pub const N_INPUTS: u8 = envelope::N_INPUTS + vco::N_INPUTS;
+pub const N_OUTPUTS: u8 = 1;
+// pub const PITCH_BEND: u8 = 9;
+// pub const VOLUME: u8 = 8;
 
 pub struct MidiOsc {
     pub oscs: Vec<(Vco, EnvelopeFilter)>,
     /// how many vcos/envs there are
     size: usize,
     notes: Vec<Option<Note>>,
+    pub overtones: bool,
     // TODO: add a single vco/env combo to be controlled with signal inputs
 }
 
 impl Default for MidiOsc {
     fn default() -> Self {
-        Self::new(10)
+        Self::new(4)
     }
 }
 
 impl MidiOsc {
     pub fn new(size: usize) -> Self {
-        let oscs = (0..size)
-            .into_iter()
-            .map(|i| (Vco::new(i as u8), EnvelopeFilter::new(i as u8)));
+        let oscs = (0..size).into_iter().map(|i| {
+            // trace!("made {i}, oscillator filter combos");
+            (Vco::new(i as u8), EnvelopeFilter::new(i as u8))
+        });
+        trace!("made oscillator and filter combos");
 
         let notes = (0..size).into_iter().map(|_| None);
 
@@ -40,13 +42,34 @@ impl MidiOsc {
             oscs: oscs.collect(),
             size,
             notes: notes.collect(),
+            overtones: false,
         }
+    }
+
+    pub fn set_polyphony(&mut self, n: usize) {
+        self.oscs = (0..n)
+            .into_iter()
+            .map(|i| (Vco::new(i as u8), EnvelopeFilter::new(i as u8)))
+            .collect();
+
+        self.notes = (0..n).into_iter().map(|_| None).collect();
+        self.size = n;
+    }
+
+    pub fn set_overtones(&mut self, on: bool) {
+        self.overtones = on;
+        self.oscs
+            .iter_mut()
+            .for_each(|(vco, _env)| vco.set_overtones(on));
     }
 
     pub fn play_note(&mut self, note: Note) -> Result<()> {
         if self.notes.contains(&Some(note)) {
             bail!("{note} is already being played.");
         }
+        // else {
+        //     debug!("playing => {note}");
+        // }
 
         for i in 0..self.size {
             if self.notes[i].is_none() {
@@ -73,9 +96,9 @@ impl MidiOsc {
             if self.notes[i] == Some(note) {
                 self.notes[i] = None;
 
-                let (_vco, ref mut env) = self.oscs.index_mut(i);
+                let (vco, ref mut env) = self.oscs.index_mut(i);
 
-                // vco.set_(0.0);
+                // vco.osc.set_frequency(0.0);
                 env.recv_samples(FILTER_OPEN_IN, &vec![0.0]);
 
                 return Ok(());
@@ -125,63 +148,140 @@ impl MidiOsc {
     }
 
     pub fn set_break(&mut self, threshold: Float) {
-        if self.oscs[0].1.filter_type == FilterType::ADBDR {
-            self.oscs
-                .iter_mut()
-                .for_each(|(_vco, env)| env.recv_samples(adbdr::DECAY_THRESHOLD, &vec![threshold]));
-        }
+        // if self.oscs[0].1.filter_type == FilterType::ADBDR {
+        //     self.oscs
+        //         .iter_mut()
+        //         .for_each(|(_vco, env)| env.recv_samples(adbdr::DECAY_THRESHOLD, &vec![threshold]));
+        // }
     }
 
     pub fn set_decay_2(&mut self, threshold: Float) {
-        if self.oscs[0].1.filter_type == FilterType::ADBDR {
-            self.oscs
-                .iter_mut()
-                .for_each(|(_vco, env)| env.recv_samples(adbdr::DECAY_2_IN, &vec![threshold]));
-        }
+        // if self.oscs[0].1.filter_type == FilterType::ADBDR {
+        //     self.oscs
+        //         .iter_mut()
+        //         .for_each(|(_vco, env)| env.recv_samples(adbdr::DECAY_2_IN, &vec![threshold]));
+        // }
+    }
+
+    pub fn set_cutoff(&mut self, value: Float) {
+        self.oscs
+            .iter_mut()
+            .for_each(|(_vco, env)| env.allpass.set_cutoff(value));
+    }
+
+    pub fn set_resonance(&mut self, value: Float) {
+        self.oscs
+            .iter_mut()
+            .for_each(|(_vco, env)| env.allpass.set_resonance(value));
     }
 }
 
 impl Module for MidiOsc {
     fn recv_samples(&mut self, input_n: u8, samples: &[lib::Float]) {
-        if input_n < 7 {
+        if input_n < envelope::N_INPUTS {
             self.oscs
                 .iter_mut()
                 .for_each(|(_vco, env)| env.recv_samples(input_n, samples));
         } else {
-            let n = if input_n == VOLUME {
-                vco::VOLUME_INPUT
-            } else if input_n == PITCH_BEND {
-                vco::PITCH_BEND_INPUT
-            } else {
-                error!("{input_n} is an invalid input_n for MidiOsc");
+            let input = input_n - envelope::N_INPUTS;
+
+            if input >= vco::N_INPUTS {
+                error!("{input_n} => {input}, is an invalid input number for the MidiOsc (MCO)");
                 return;
             };
 
             self.oscs
                 .iter_mut()
-                .for_each(|(vco, _env)| vco.recv_samples(n, samples));
+                .for_each(|(vco, _env)| vco.recv_samples(input, samples));
         }
     }
 
     fn get_samples(&mut self) -> Vec<(u8, lib::Float)> {
-        let sample: Float = self
+        let raw_sample: Float = self
             .oscs
             .iter_mut()
-            .map(|(vco, env)| {
-                let sample: Float = vco
-                    .get_samples()
-                    .into_iter()
-                    .map(|(output, sample)| sample)
-                    .sum();
-                env.recv_samples(envelope::AUDIO_IN, &vec![sample]);
+            .filter_map(|(vco, env)| {
+                if env.is_pressed() {
+                    let sample: Float = vco
+                        .get_samples()
+                        .into_iter()
+                        .map(|(output, sample)| sample)
+                        .sum();
 
-                env.get_samples()
-                    .into_iter()
-                    .map(|(output, sample)| sample)
-                    .sum::<Float>()
+                    env.recv_samples(envelope::AUDIO_IN, &vec![sample]);
+
+                    // debug!("{} => {}", env.envelope.get_env(), sample);
+
+                    Some(
+                        env.get_samples()
+                            .into_iter()
+                            .filter_map(|(output, sample)| {
+                                if output == envelope::AUDIO_OUT {
+                                    Some(sample)
+                                } else {
+                                    None
+                                }
+                            })
+                            .sum::<Float>(),
+                    )
+                } else {
+                    // vco.osc.set_frequency(0.0);
+                    None
+                }
             })
             .sum();
+        // .sum();
+        let n_notes = self
+            .notes
+            .iter()
+            .filter_map(|note| *note)
+            .collect::<Vec<_>>()
+            .len() as Float;
+        // // info!("n_notes {n_notes}");
+        // let sample = if n_notes > 0.0 {
+        //     raw_sample * n_notes
+        // } else {
+        //     0.0
+        // };
+        // let raw_sample: Float = raw_samples.iter().sum();
+        // let n_notes = raw_samples.iter().len() as Float;
+        // info!("n_notes {}", n_notes * 2.0 / n_notes.exp());
+        // info!("n_notes {}", 0.75 / n_notes.ln_1p());
 
-        vec![(0, sample.tanh())]
+        let sample = if n_notes > 1.0 {
+            raw_sample / n_notes.sqrt()
+        } else {
+            raw_sample
+        };
+
+        // info!("sample {raw_sample} : {sample}");
+
+        vec![(0, sample)]
+    }
+
+    fn get_input_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        let mut vco: Vec<String> = Vco::get_input_names()
+            .map(|name| format!("{name}"))
+            .collect();
+        let mut env: Vec<String> = EnvelopeFilter::get_input_names()
+            .map(|name| format!("{name}"))
+            .collect();
+
+        vco.append(&mut env);
+
+        vco.into_iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl std::fmt::Display> {
+        let mut vco: Vec<String> = Vco::get_output_names()
+            .map(|name| format!("{name}"))
+            .collect();
+        let mut env: Vec<String> = EnvelopeFilter::get_output_names()
+            .map(|name| format!("{name}"))
+            .collect();
+
+        vco.append(&mut env);
+
+        vco.into_iter()
     }
 }

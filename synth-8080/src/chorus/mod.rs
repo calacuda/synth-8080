@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{common::Module, Float, SAMPLE_RATE};
 use tracing::*;
 
@@ -92,5 +94,13 @@ impl Module for Chorus {
         } else {
             error!("invalid input for echo module: {input_n}");
         }
+    }
+
+    fn get_input_names() -> impl Iterator<Item = impl Display> {
+        ["Audio In", "Speed", "Vol."].iter()
+    }
+
+    fn get_output_names() -> impl Iterator<Item = impl Display> {
+        ["Audio Out"].iter()
     }
 }

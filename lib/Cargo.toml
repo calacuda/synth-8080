@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-HiFi = []
+HiFi = ["double_float", "wav_sample_rate"]
+double_float = []
+wav_sample_rate = []
 
 [dependencies]
 serde = { version = "1.0.196", features = ["derive"] }

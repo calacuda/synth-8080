@@ -16,7 +16,8 @@
     - [x] Echo
     - [ ] Attenuator
     - [x] LFO
-    <!-- - [ ] Mid-Pass -->
+    - [x] Low-Pass
+    - [x] High-Pass
     - [x] Output
     - [x] Reverb
     - [x] VCO
@@ -39,7 +40,7 @@
     - NOTE: probably with a secondary micro-controller
 11. [ ] add a "get state" http end point for the tauri app to query
     - NOTE: use unix socket instead, will be more reasorce efficient
-12. [ ] write tauri GUI front end
+12. [x] write tauri GUI front end
 13. [ ] write ansible play book to install & setup\configure all this on a ras-pi (including flashing the micro-controller)
 14. [ ] build the housing
 15. [x] write midi inputs
@@ -50,10 +51,20 @@
 18. [ ] add ability to temporarily disconnect connections that are already made.
 19. [ ] add IPC (over usix socket or maybe websockets, to be more crossplatform) so other processes can change the synths parameters.
 20. [ ] -> add tauri events to change front end on synth-param changes <- (do this next)
+    - [x] connections display change on backend changes
+    - [ ] change lfo/mco oscillator types on backend change
+    - [ ] change envelop filter types on backend change
 21. [ ] make the sliders set the value they control to 50% at load
 22. [ ] add scriptability (using a custom lisp dialect)
-    - [ ] design said dialect
+    - [ ] design lisp dialect
+        - functions to set tempo, play/stop notes, alter synth params, etc
+        - functions to schedule events for the future
+        - functions to play arpegios, 
     - [ ] implement the basics
     - [ ] build a std-lib
-    - [ ] add a IPC control for refreshing/reloading or even changing the loaded script (so a text editor can notify the synth on file saves.)
-    - [ ] 
+    - [ ] add an IPC control for refreshing/reloading or even changing the loaded script (so a text editor can notify the synth on file saves.)
+23. [ ] make display to preview a connection before its made.
+24. [ ] add looper
+25. [ ] add button to manually connect a midi input (to reconnect a keyboard or allow a connection to be made after the synth starts)
+26. [ ] make midi input a module that can be wired to MCO or VCO
+27. [x] make MCO take a configurable (and change able) number to set polyphony

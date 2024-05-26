@@ -8,6 +8,15 @@ edition = "2021"
 default = [ "hardware", "HiFi" ]
 hardware = [ "dep:serialport" ]
 HiFi = [ "lib/HiFi" ]
+# HiFi = ["double_float", "wav_sample_rate"]
+double_float = [ "lib/double_float" ]
+wav_sample_rate = [ "lib/wav_sample_rate" ]
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+incremental = true
 
 [dependencies]
 anyhow = "1.0.79"
