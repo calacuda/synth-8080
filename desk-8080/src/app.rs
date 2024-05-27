@@ -1,9 +1,9 @@
-use leptos::{ev::Event, leptos_dom::logging::console_log, *};
+use leptos::{leptos_dom::logging::console_log, *};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
 use std::str::FromStr;
 use strum::IntoEnumIterator;
-use synth_8080_lib::{notes::Note, FilterType, Float, ModuleType, OscType};
+use synth_8080_lib::{notes::Note, FilterType, ModuleType, OscType};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -11,6 +11,9 @@ extern "C" {
     #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "tauri"])]
     async fn invoke(cmd: &str, args: JsValue) -> JsValue;
 }
+
+pub const SLIDER_MAX: usize = 100_000;
+pub type SliderVal = f32;
 
 #[derive(Serialize, Deserialize)]
 struct PlayArgs {
@@ -25,13 +28,13 @@ struct LfoStateArgs {
 #[derive(Serialize, Deserialize)]
 struct LfoFreqSetArgs {
     id: u8,
-    frequency: Float,
+    frequency: SliderVal,
 }
 
 #[derive(Serialize, Deserialize)]
 struct LfoVolSetArgs {
     id: u8,
-    volume: Float,
+    volume: SliderVal,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,7 +45,7 @@ struct LfoSetOscType {
 
 #[derive(Serialize, Deserialize)]
 struct VcoVolSetArgs {
-    volume: Float,
+    volume: SliderVal,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -55,7 +58,7 @@ struct Empty {}
 
 #[derive(Serialize, Deserialize)]
 struct EnvSetArgs {
-    value: Float,
+    value: SliderVal,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -77,6 +80,13 @@ struct PolyphonySetArgs {
 #[derive(Serialize, Deserialize)]
 struct SetOvertonesArgs {
     enabled: bool,
+}
+
+/// converts a slider position to a float that represents where the slider is on its "throw". will
+/// return a float between 0 and 1. returns an f32 for consistnacy and "better safe then sorry"
+/// reasons between "f64" samples and "f32" samples modes.
+fn slider_to_float(slider_val: usize) -> SliderVal {
+    slider_val as SliderVal / SLIDER_MAX as SliderVal
 }
 
 #[component]
@@ -119,15 +129,18 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn Slider(on_input: Box<dyn FnMut(Event)>) -> impl IntoView {
+fn Slider(mut on_input: Box<dyn FnMut(f32)>) -> impl IntoView {
     // TODO: make it change with back end.
     view! {
         <input
             type="range"
-            min="1"
-            max="10000"
-            value="5000"
-            on:input=on_input
+            min=1
+            max=SLIDER_MAX
+            value=SLIDER_MAX / 2
+            on:input=move |ev| {
+                let position: usize = event_target_value(&ev).parse().unwrap();
+                on_input(slider_to_float(position))
+            }
         />
     }
 }
@@ -153,13 +166,13 @@ fn LFO(index: u8) -> impl IntoView {
         )
     });
 
-    let on_pitch_input = move |ev| {
+    let on_pitch_input = move |val| {
         spawn_local(async move {
             invoke(
                 "set_lfo_freq",
                 to_value(&LfoFreqSetArgs {
                     id: index,
-                    frequency: event_target_value(&ev).parse().unwrap(),
+                    frequency: val,
                 })
                 .unwrap(),
             )
@@ -167,13 +180,13 @@ fn LFO(index: u8) -> impl IntoView {
         })
     };
 
-    let on_vol_input = move |ev| {
+    let on_vol_input = move |val| {
         spawn_local(async move {
             invoke(
                 "set_lfo_vol",
                 to_value(&LfoVolSetArgs {
                     id: index,
-                    volume: event_target_value(&ev).parse().unwrap(),
+                    volume: val,
                 })
                 .unwrap(),
             )
@@ -266,14 +279,11 @@ fn VCO() -> impl IntoView {
         )
     });
 
-    let on_volume_input = move |ev| {
+    let on_volume_input = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_vco_vol",
-                to_value(&VcoVolSetArgs {
-                    volume: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&VcoVolSetArgs { volume: pos }).unwrap(),
             )
             .await;
         })
@@ -398,16 +408,9 @@ fn EnvFilter() -> impl IntoView {
     };
 
     let attack = move || {
-        let set_attack = move |ev| {
+        let set_attack = move |pos| {
             spawn_local(async move {
-                invoke(
-                    "set_env_atk",
-                    to_value(&EnvSetArgs {
-                        value: event_target_value(&ev).parse().unwrap(),
-                    })
-                    .unwrap(),
-                )
-                .await;
+                invoke("set_env_atk", to_value(&EnvSetArgs { value: pos }).unwrap()).await;
             })
         };
 
@@ -422,14 +425,11 @@ fn EnvFilter() -> impl IntoView {
     };
 
     let decay = move || {
-        let set_decay = move |ev| {
+        let set_decay = move |pos| {
             spawn_local(async move {
                 invoke(
                     "set_env_decay",
-                    to_value(&EnvSetArgs {
-                        value: event_target_value(&ev).parse().unwrap(),
-                    })
-                    .unwrap(),
+                    to_value(&EnvSetArgs { value: pos }).unwrap(),
                 )
                 .await;
             })
@@ -446,14 +446,11 @@ fn EnvFilter() -> impl IntoView {
     };
 
     let sustain = move || {
-        let set_sustain = move |ev| {
+        let set_sustain = move |pos| {
             spawn_local(async move {
                 invoke(
                     "set_env_sustain",
-                    to_value(&EnvSetArgs {
-                        value: event_target_value(&ev).parse().unwrap(),
-                    })
-                    .unwrap(),
+                    to_value(&EnvSetArgs { value: pos }).unwrap(),
                 )
                 .await;
             })
@@ -518,14 +515,11 @@ fn EnvFilter() -> impl IntoView {
     // };
 
     let cutoff = move || {
-        let set_cutoff = move |ev| {
+        let set_cutoff = move |pos| {
             spawn_local(async move {
                 invoke(
                     "set_env_cutoff",
-                    to_value(&EnvSetArgs {
-                        value: event_target_value(&ev).parse().unwrap(),
-                    })
-                    .unwrap(),
+                    to_value(&EnvSetArgs { value: pos }).unwrap(),
                 )
                 .await;
             })
@@ -538,14 +532,11 @@ fn EnvFilter() -> impl IntoView {
     };
 
     let resonance = move || {
-        let set_resonance = move |ev| {
+        let set_resonance = move |pos| {
             spawn_local(async move {
                 invoke(
                     "set_env_resonance",
-                    to_value(&EnvSetArgs {
-                        value: event_target_value(&ev).parse().unwrap(),
-                    })
-                    .unwrap(),
+                    to_value(&EnvSetArgs { value: pos }).unwrap(),
                 )
                 .await;
             })
@@ -608,27 +599,21 @@ fn EnvFilter() -> impl IntoView {
 
 #[component]
 fn Echo() -> impl IntoView {
-    let on_volume = move |ev| {
+    let on_volume = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_echo_vol",
-                to_value(&VcoVolSetArgs {
-                    volume: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&VcoVolSetArgs { volume: pos }).unwrap(),
             )
             .await;
         })
     };
 
-    let on_speed = move |ev| {
+    let on_speed = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_echo_speed",
-                to_value(&EnvSetArgs {
-                    value: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&EnvSetArgs { value: pos }).unwrap(),
             )
             .await;
         })
@@ -649,27 +634,21 @@ fn Echo() -> impl IntoView {
 
 #[component]
 fn Chorus() -> impl IntoView {
-    let on_volume = move |ev| {
+    let on_volume = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_chorus_vol",
-                to_value(&VcoVolSetArgs {
-                    volume: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&VcoVolSetArgs { volume: pos }).unwrap(),
             )
             .await;
         })
     };
 
-    let on_speed = move |ev| {
+    let on_speed = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_chorus_speed",
-                to_value(&EnvSetArgs {
-                    value: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&EnvSetArgs { value: pos }).unwrap(),
             )
             .await;
         })
@@ -690,14 +669,11 @@ fn Chorus() -> impl IntoView {
 
 #[component]
 fn Overdrive() -> impl IntoView {
-    let on_gain_input = move |ev| {
+    let on_gain_input = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_od_gain",
-                to_value(&VcoVolSetArgs {
-                    volume: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&VcoVolSetArgs { volume: pos }).unwrap(),
             )
             .await;
         })
@@ -717,14 +693,11 @@ fn Overdrive() -> impl IntoView {
 
 #[component]
 fn Volume() -> impl IntoView {
-    let on_volume_input = move |ev| {
+    let on_volume_input = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_output_volume",
-                to_value(&VcoVolSetArgs {
-                    volume: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&VcoVolSetArgs { volume: pos }).unwrap(),
             )
             .await;
         })
@@ -744,27 +717,21 @@ fn Volume() -> impl IntoView {
 
 #[component]
 fn Reverb() -> impl IntoView {
-    let on_gain = move |ev| {
+    let on_gain = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_reverb_gain",
-                to_value(&VcoVolSetArgs {
-                    volume: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&VcoVolSetArgs { volume: pos }).unwrap(),
             )
             .await;
         })
     };
 
-    let on_decay = move |ev| {
+    let on_decay = move |pos| {
         spawn_local(async move {
             invoke(
                 "set_reverb_decay",
-                to_value(&EnvSetArgs {
-                    value: event_target_value(&ev).parse().unwrap(),
-                })
-                .unwrap(),
+                to_value(&EnvSetArgs { value: pos }).unwrap(),
             )
             .await;
         })
@@ -801,7 +768,7 @@ fn Connections() -> impl IntoView {
 
     let (dest_mod_type, set_dest_mod_type) = create_signal::<Option<ModuleType>>(None);
     let (dest_mod_index, set_dest_mod_index) = create_signal::<usize>(0);
-    let (dest_mod_output, set_dest_mod_input) = create_signal::<u8>(0);
+    let (dest_mod_input, set_dest_mod_input) = create_signal::<u8>(0);
 
     // let (svg_src, set_svg_src) = create_signal(String::new());
 
@@ -819,7 +786,7 @@ fn Connections() -> impl IntoView {
                     "connect",
                     to_value(&EditConnectionArgs {
                         src_mod: (src_mod, src_mod_index.get(), src_mod_output.get()),
-                        dest_mod: (dest_mod, dest_mod_index.get(), dest_mod_output.get()),
+                        dest_mod: (dest_mod, dest_mod_index.get(), dest_mod_input.get()),
                     })
                     .unwrap(),
                 )
@@ -836,7 +803,12 @@ fn Connections() -> impl IntoView {
             });
 
             set_src_mod_type.set(None);
+            set_src_mod_index.set(0);
+            set_src_mod_output.set(0);
+
             set_dest_mod_type.set(None);
+            set_dest_mod_index.set(0);
+            set_dest_mod_input.set(0);
         }
     };
 
@@ -934,82 +906,118 @@ fn Connections() -> impl IntoView {
                     <div>
                         <h1> Destination Module </h1>
                         <div class="border-4 rounded-md border-black justify-center text-center grid grid-cols-2">
-                        // get mod_type
-                        <div class="text-left">
-                            <legend>Module Type:</legend>
-                            <For
-                                each=move || ModuleType::iter()
-                                key = move |module| (module.clone(), Some(*module) == dest_mod_type.get())
-                                children=move |module| {
-                                    view! {
-                                        <div>
-                                            <button
-                                                on:click=move |_| {
-                                                    if dest_mod_type.get() == Some(module) {
-                                                        set_dest_mod_type.set(None)
-                                                    } else {
-                                                        set_dest_mod_type.set(Some(module))
+                            // get mod_type
+                            <div class="text-left">
+                                <legend>Module Type:</legend>
+                                <For
+                                    each=move || ModuleType::iter()
+                                    key = move |module| (module.clone(), Some(*module) == dest_mod_type.get())
+                                    children=move |module| {
+                                        view! {
+                                            <div>
+                                                <button
+                                                    on:click=move |_| {
+                                                        if dest_mod_type.get() == Some(module) {
+                                                            set_dest_mod_type.set(None)
+                                                        } else {
+                                                            set_dest_mod_type.set(Some(module))
+                                                        }
                                                     }
-                                                }
-                                            > { if dest_mod_type.get() == Some(module) { format!("- [x] {module}") } else { format!("- [ ] {module}") } } </button>
-                                        </div>
+                                                > { if dest_mod_type.get() == Some(module) { format!("- [x] {module}") } else { format!("- [ ] {module}") } } </button>
+                                            </div>
+                                        }
+                                    }
+                                />
+                            </div>
+                            <div class="justify-center text-center grid grid-rows-2">
+                                // get mod index
+                                {
+                                    move || { if dest_mod_type.get().is_some() {
+                                        view! {
+                                            <div class="text-left">
+                                                <legend>Index:</legend>
+                                                <input type="number"
+                                                    on:change=move |ev| {
+                                                        set_dest_mod_index.set(event_target_value(&ev).parse().unwrap_or(0))
+                                                    }
+                                                    min="0"
+                                                    max="255"
+                                                    value="0"
+                                                />
+                                                // <label for="src_mod_index"> { format!("{module:?}") } </label>
+                                            </div>
+                                        }
+                                    } else {
+                                        view! {
+                                            <div class="text-left">
+                                            </div>
+                                        }
+                                    }}
+                                }
+                                // get mod output
+                                {
+                                    move || { if dest_mod_type.get().is_some() {
+                                        view! {
+                                            <div class="text-left">
+                                                <legend>Input:</legend>
+                                                <input type="number" id="src_mod_index"
+                                                    on:change=move |ev| {
+                                                        set_dest_mod_input.set(event_target_value(&ev).parse().unwrap_or(0))
+                                                    }
+                                                    min="0"
+                                                    max="255"
+                                                    value="0"
+                                                />
+                                            </div>
+                                        }
+                                    } else {
+                                        view! {
+                                            <div class="text-left">
+                                            </div>
+                                        }
+                                    }}
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-span-2">
+                        <button on:click=connect> Connect </button>
+                        // display connection before connecting
+                        <div class="grid grid-cols-3">
+                            <div>
+                                {
+                                    move || {
+                                        if let Some(src_mod_type) = src_mod_type.get() {
+                                            format!("{}[{}]:{}", src_mod_type, src_mod_index.get(), src_mod_output.get())
+                                        } else {
+                                            String::new()
+                                        }
                                     }
                                 }
-                            />
+                            </div>
+                            <div>
+                                {
+                                    move || {
+                                        if src_mod_type.get().is_some() || dest_mod_type.get().is_some() {
+                                            "=>"
+                                        } else {
+                                            ""
+                                        }
+                                    }
+                                }
+                            </div>
+                            <div>
+                                {
+                                    move || {
+                                        if let Some(dest_mod_type) = dest_mod_type.get() {
+                                            format!("{}[{}]:{}", dest_mod_type, dest_mod_index.get(), dest_mod_input.get())
+                                        } else {
+                                            String::new()
+                                        }
+                                    }
+                                }
+                            </div>
                         </div>
-                        <div class="justify-center text-center grid grid-rows-2">
-                            // get mod index
-                        {
-                            move || { if dest_mod_type.get().is_some() {
-                                view! {
-                                    <div class="text-left">
-                                        <legend>Index:</legend>
-                                        <input type="number"
-                                            on:change=move |ev| {
-                                                set_dest_mod_index.set(event_target_value(&ev).parse().unwrap_or(0))
-                                            }
-                                            min="0"
-                                            max="255"
-                                            value="0"
-                                        />
-                                        // <label for="src_mod_index"> { format!("{module:?}") } </label>
-                                    </div>
-                                }
-                            } else {
-                                view! {
-                                    <div class="text-left">
-                                    </div>
-                                }
-                            }}
-                        }
-                        // get mod output
-                        {
-                            move || { if dest_mod_type.get().is_some() {
-                                view! {
-                                    <div class="text-left">
-                                        <legend>Input:</legend>
-                                        <input type="number" id="src_mod_index"
-                                            on:change=move |ev| {
-                                                set_dest_mod_input.set(event_target_value(&ev).parse().unwrap_or(0))
-                                            }
-                                            min="0"
-                                            max="255"
-                                            value="0"
-                                        />
-                                    </div>
-                                }
-                            } else {
-                                view! {
-                                    <div class="text-left">
-                                    </div>
-                                }
-                            }}
-                        }
-                    </div>
-                    </div>                    </div>
-                    <div class="col-span-2">
-                        // display connection before connecting
-                        <button on:click=connect> Connect </button>
                     </div>
                 </div>
             </div>

@@ -130,20 +130,20 @@ impl MidiOsc {
     pub fn set_attack(&mut self, atk: Float) {
         self.oscs
             .iter_mut()
-            .for_each(|(_vco, env)| env.recv_samples(3, &vec![atk]));
+            .for_each(|(_vco, env)| env.recv_samples(4, &vec![atk]));
     }
 
     pub fn set_decay(&mut self, decay: Float) {
         self.oscs
             .iter_mut()
-            .for_each(|(_vco, env)| env.recv_samples(4, &vec![decay]));
+            .for_each(|(_vco, env)| env.recv_samples(5, &vec![decay]));
     }
 
     pub fn set_sustain(&mut self, threshold: Float) {
         if self.oscs[0].1.filter_type == FilterType::ADSR {
             self.oscs
                 .iter_mut()
-                .for_each(|(_vco, env)| env.recv_samples(adsr::DECAY_THRESHOLD, &vec![threshold]));
+                .for_each(|(_vco, env)| env.recv_samples(6, &vec![threshold]));
         }
     }
 
@@ -166,13 +166,15 @@ impl MidiOsc {
     pub fn set_cutoff(&mut self, value: Float) {
         self.oscs
             .iter_mut()
-            .for_each(|(_vco, env)| env.allpass.set_cutoff(value));
+            // .for_each(|(_vco, env)| env.allpass.set_cutoff(value));
+            .for_each(|(_vco, env)| env.lowpass.set_cutoff(value));
     }
 
     pub fn set_resonance(&mut self, value: Float) {
         self.oscs
             .iter_mut()
-            .for_each(|(_vco, env)| env.allpass.set_resonance(value));
+            // .for_each(|(_vco, env)| env.allpass.set_resonance(value));
+            .for_each(|(_vco, env)| env.lowpass.set_resonance(value));
     }
 }
 

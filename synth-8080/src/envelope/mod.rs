@@ -6,7 +6,7 @@ use lib::FilterType;
 use log::info;
 use tracing::*;
 
-use self::allpass::AllPassFilter;
+use self::allpass::{AllPassFilter, LowPassFilter};
 
 pub mod ad;
 pub mod adbdr;
@@ -87,7 +87,8 @@ pub struct EnvelopeFilter {
     pub audio_in: Float,
     /// the id which identifies this module from all others
     pub id: u8,
-    pub allpass: AllPassFilter,
+    // pub allpass: AllPassFilter,
+    pub lowpass: LowPassFilter,
 }
 
 impl EnvelopeFilter {
@@ -101,7 +102,8 @@ impl EnvelopeFilter {
             envelope: Box::new(adsr::Filter::new()),
             audio_in: 0.0,
             id,
-            allpass: filter,
+            // allpass: filter,
+            lowpass: LowPassFilter::new(),
         }
     }
 
@@ -125,8 +127,8 @@ impl EnvelopeFilter {
 impl Module for EnvelopeFilter {
     fn get_samples(&mut self) -> Vec<(u8, Float)> {
         let env = self.envelope.step();
-        self.allpass.take_env(env);
-        let sample = (self.audio_in + self.allpass.get_sample(self.audio_in)) * env;
+        self.lowpass.take_env(env);
+        let sample = (self.audio_in + self.lowpass.get_sample(self.audio_in)) * env;
         // let sample = self.audio_in * env;
 
         let open = if self.envelope.pressed() { 1.0 } else { 0.0 };
@@ -153,7 +155,7 @@ impl Module for EnvelopeFilter {
         } else if input_n == 3 {
             let sample: Float = samples.iter().sum();
             // self.allpass.set_cutoff(sample.tanh());
-            self.allpass.wiggle_cutoff(sample.tanh());
+            // self.allpass.wiggle_cutoff(sample.tanh());
         } else if input_n == 4 {
             let _ = self.envelope.take_input(0, samples.to_vec());
         } else if input_n == 5 {

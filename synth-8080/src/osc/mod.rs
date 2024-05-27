@@ -10,7 +10,7 @@ pub mod triangle;
 
 pub type Harmonics = Arc<[f32; HARMONICS_SIZE]>;
 
-pub const HARMONICS_SIZE: usize = 15;
+pub const HARMONICS_SIZE: usize = 20;
 // pub const DEFAULT_HARMONICS: [f32; HARMONICS_SIZE] = [
 //     0.700, 0.243, 0.229, 0.095, 0.139, 0.087, 0.288, 0.199, 0.124, 0.090,
 // ];
@@ -31,6 +31,11 @@ pub const HARMONICS_SIZE: usize = 15;
 // ];
 pub const DEFAULT_HARMONICS: [f32; HARMONICS_SIZE] = [
     1.0,
+    1.0 / 2.0,
+    1.0 / 2.0,
+    1.0 / 2.0,
+    1.0 / 2.0,
+    1.0 / 2.0,
     1.0 / 2.0,
     1.0 / 2.0,
     1.0 / 2.0,

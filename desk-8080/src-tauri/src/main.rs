@@ -76,12 +76,12 @@ fn set_lfo_freq(synth: State<'_, Arc<Controller>>, id: u8, frequency: Float) {
 
 #[tauri::command]
 fn set_lfo_vol(synth: State<'_, Arc<Controller>>, id: u8, volume: Float) {
-    synth.modules.lock().unwrap().lfo[id as usize].volume_in = volume / 10000.0;
+    synth.modules.lock().unwrap().lfo[id as usize].volume_in = volume;
 }
 
 #[tauri::command]
 fn set_vco_vol(synth: State<'_, Arc<Controller>>, volume: Float) {
-    synth.modules.lock().unwrap().mco[0].set_volume(volume / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_volume(volume);
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -106,75 +106,71 @@ fn get_vco_osc(synth: State<'_, Arc<Controller>>) -> OscType {
 
 #[tauri::command]
 fn set_env_atk(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().mco[0].set_attack(value / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_attack(value);
 }
 
 #[tauri::command]
 fn set_env_decay(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().mco[0].set_decay(value / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_decay(value);
 }
 
 #[tauri::command]
 fn set_env_break(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().mco[0].set_break(value / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_break(value);
 }
 
 #[tauri::command]
 fn set_env_sustain(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().mco[0].set_sustain(value / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_sustain(value);
 }
 
 #[tauri::command]
 fn set_env_decay_2(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().mco[0].set_decay_2(value / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_decay_2(value);
 }
 
 #[tauri::command]
 fn set_echo_vol(synth: State<'_, Arc<Controller>>, volume: Float) {
-    synth.modules.lock().unwrap().echo[0].recv_samples(echo::DECAY_INPUT, &vec![volume / 10000.0]);
+    synth.modules.lock().unwrap().echo[0].recv_samples(echo::DECAY_INPUT, &vec![volume]);
 }
 
 #[tauri::command]
 fn set_echo_speed(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().echo[0].recv_samples(echo::SPEED_INPUT, &vec![value / 10000.0]);
+    synth.modules.lock().unwrap().echo[0].recv_samples(echo::SPEED_INPUT, &vec![value]);
 }
 
 #[tauri::command]
 fn set_chorus_vol(synth: State<'_, Arc<Controller>>, volume: Float) {
-    synth.modules.lock().unwrap().chorus[0]
-        .recv_samples(chorus::DECAY_INPUT, &vec![volume / 10000.0]);
+    synth.modules.lock().unwrap().chorus[0].recv_samples(chorus::DECAY_INPUT, &vec![volume]);
 }
 
 #[tauri::command]
 fn set_chorus_speed(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().chorus[0]
-        .recv_samples(chorus::SPEED_INPUT, &vec![value / 10000.0]);
+    synth.modules.lock().unwrap().chorus[0].recv_samples(chorus::SPEED_INPUT, &vec![value]);
 }
 
 #[tauri::command]
 fn set_od_gain(synth: State<'_, Arc<Controller>>, volume: Float) {
-    synth.modules.lock().unwrap().over_drive[0]
-        .recv_samples(overdrive::GAIN_INPUT, &vec![volume / 10000.0]);
+    synth.modules.lock().unwrap().over_drive[0].recv_samples(overdrive::GAIN_INPUT, &vec![volume]);
 }
 
 #[tauri::command]
 fn set_output_volume(synth: State<'_, Arc<Controller>>, volume: Float) {
     let mut output = synth.output.lock().unwrap();
-    (*output).volume = volume / 10000.0;
+    (*output).volume = volume;
 }
 
 #[tauri::command]
 fn set_reverb_gain(synth: State<'_, Arc<Controller>>, volume: Float) {
     // Gain control of Reverb is an f32 (as mandated by the library)
-    let v: f32 = (volume / 10000.0) as f32;
+    let v: f32 = volume.into();
 
     synth.modules.lock().unwrap().reverb[0].gain = v;
 }
 
 #[tauri::command]
 fn set_reverb_decay(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().reverb[0]
-        .recv_samples(reverb::DECAY_INPUT, &vec![value / 10000.0]);
+    synth.modules.lock().unwrap().reverb[0].recv_samples(reverb::DECAY_INPUT, &vec![value]);
 }
 
 #[tauri::command]
@@ -495,12 +491,12 @@ fn enable_overtones(synth: State<'_, Arc<Controller>>, enabled: bool) {
 
 #[tauri::command]
 fn set_env_cutoff(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().mco[0].set_cutoff(value / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_cutoff(value);
 }
 
 #[tauri::command]
 fn set_env_resonance(synth: State<'_, Arc<Controller>>, value: Float) {
-    synth.modules.lock().unwrap().mco[0].set_resonance(value / 10000.0);
+    synth.modules.lock().unwrap().mco[0].set_resonance(value);
 }
 
 fn start_midi(synth: Arc<Controller>) -> anyhow::Result<MIDIControls> {

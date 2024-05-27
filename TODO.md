@@ -63,8 +63,9 @@
     - [ ] implement the basics
     - [ ] build a std-lib
     - [ ] add an IPC control for refreshing/reloading or even changing the loaded script (so a text editor can notify the synth on file saves.)
-23. [ ] make display to preview a connection before its made.
+23. [x] make display to preview a connection before its made.
 24. [ ] add looper
 25. [ ] add button to manually connect a midi input (to reconnect a keyboard or allow a connection to be made after the synth starts)
 26. [ ] make midi input a module that can be wired to MCO or VCO
 27. [x] make MCO take a configurable (and change able) number to set polyphony
+28. [x] make a envelope modulate resonance

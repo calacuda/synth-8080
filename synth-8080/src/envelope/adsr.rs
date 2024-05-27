@@ -141,7 +141,7 @@ impl Envelope for Filter {
     }
 
     fn take_input(&mut self, input: u8, samples: Vec<Float>) -> Result<()> {
-        let sample: Float = samples.iter().sum::<Float>().tanh();
+        let sample: Float = samples.iter().sum::<Float>();
 
         match input {
             // attack in
