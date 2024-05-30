@@ -69,3 +69,4 @@
 26. [ ] make midi input a module that can be wired to MCO or VCO
 27. [x] make MCO take a configurable (and change able) number to set polyphony
 28. [x] make a envelope modulate resonance
+<!-- 29. [ ]  -->

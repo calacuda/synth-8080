@@ -275,10 +275,12 @@ pub async fn main() -> Result<()> {
     // _ = ctrlr.connect(4, 0, 0, 0);
 
     _ = ctrlr.connect(1, 0, 0, 0);
+    // ctrlr.modules.lock().unwrap().mco[0].set_overtones(false);
+    // ctrlr.modules.lock().unwrap().mco[0].set_polyphony(1);
+    ctrlr.modules.lock().unwrap().mco[0].set_resonance(0.75);
+    ctrlr.modules.lock().unwrap().mco[0].set_cutoff(0.1);
 
-    {
-        ctrlr.output.lock().unwrap().set_volume(0.5);
-    }
+    // ctrlr.output.lock().unwrap().set_volume(0.5);
 
     let audio_gen = AudioGen {
         controller: ctrlr.clone(),

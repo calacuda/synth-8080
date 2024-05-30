@@ -88,13 +88,21 @@ pub struct EnvelopeFilter {
     /// the id which identifies this module from all others
     pub id: u8,
     // pub allpass: AllPassFilter,
-    pub lowpass: LowPassFilter,
+    // pub lowpass: LowPassFilter,
+    pub filter: Box<dyn Filter>,
 }
 
 impl EnvelopeFilter {
     pub fn new(id: u8) -> Self {
-        let mut filter = AllPassFilter::new();
-        filter.init();
+        let filter: Box<dyn Filter> = if cfg!(feature = "allpass") {
+            warn!("using allpass-based lowpass filter to save reasource");
+            let mut filter = AllPassFilter::new();
+            filter.init();
+            Box::new(filter)
+        } else {
+            warn!("using true lowpass filter to for better quality");
+            Box::new(LowPassFilter::new())
+        };
 
         Self {
             filter_type: FilterType::ADSR,
@@ -103,7 +111,8 @@ impl EnvelopeFilter {
             audio_in: 0.0,
             id,
             // allpass: filter,
-            lowpass: LowPassFilter::new(),
+            // lowpass: LowPassFilter::new(),
+            filter,
         }
     }
 
@@ -127,8 +136,8 @@ impl EnvelopeFilter {
 impl Module for EnvelopeFilter {
     fn get_samples(&mut self) -> Vec<(u8, Float)> {
         let env = self.envelope.step();
-        self.lowpass.take_env(env);
-        let sample = (self.audio_in + self.lowpass.get_sample(self.audio_in)) * env;
+        self.filter.take_env(env);
+        let sample = (self.audio_in + self.filter.get_sample(self.audio_in)) * env;
         // let sample = self.audio_in * env;
 
         let open = if self.envelope.pressed() { 1.0 } else { 0.0 };
@@ -156,6 +165,7 @@ impl Module for EnvelopeFilter {
             let sample: Float = samples.iter().sum();
             // self.allpass.set_cutoff(sample.tanh());
             // self.allpass.wiggle_cutoff(sample.tanh());
+            // self.filter.
         } else if input_n == 4 {
             let _ = self.envelope.take_input(0, samples.to_vec());
         } else if input_n == 5 {
@@ -174,6 +184,7 @@ impl Module for EnvelopeFilter {
             "Filter Select",
             "Audio In",
             "Open Filter",
+            "Wiggle Resonace",
             "Attack",
             "Decay",
             "Sus/Break",

@@ -86,7 +86,11 @@ struct SetOvertonesArgs {
 /// return a float between 0 and 1. returns an f32 for consistnacy and "better safe then sorry"
 /// reasons between "f64" samples and "f32" samples modes.
 fn slider_to_float(slider_val: usize) -> SliderVal {
-    slider_val as SliderVal / SLIDER_MAX as SliderVal
+    if slider_val != 0 {
+        slider_val as SliderVal / SLIDER_MAX as SliderVal
+    } else {
+        SliderVal::MIN
+    }
 }
 
 #[component]
@@ -94,7 +98,7 @@ pub fn App() -> impl IntoView {
     // TODO: add a button to scan for midi devices and choose which vco to connect them to.
 
     view! {
-        <main class="p-4">
+        <main class="w-dvw h-dvh p-4">
             <div class="grid grid-cols-4 gap-4">
                 <div class="col-span-2">
                     <LFOs/>
@@ -134,7 +138,7 @@ fn Slider(mut on_input: Box<dyn FnMut(f32)>) -> impl IntoView {
     view! {
         <input
             type="range"
-            min=1
+            min=0
             max=SLIDER_MAX
             value=SLIDER_MAX / 2
             on:input=move |ev| {
@@ -210,28 +214,38 @@ fn LFO(index: u8) -> impl IntoView {
                 </div>
 
                 // oscillator type indicator
-                <div class="grid grid-flex-row">
+                <div class="grid grid-flex-row text-left">
                     <For
                         each=move || OscType::iter()
                         key=move |key| (key.clone(), *key == lfo_type.get())
                         children=move |osc| {
                             view! {
                                 <div>
-                                    <button on:click=move |_| {
-                                        spawn_local(async move {
-                                            invoke(
-                                                "set_lfo_osc",
-                                                to_value(&LfoSetOscType { id: index, osc_type: osc }).unwrap(),
-                                            )
-                                            .await;
-                                            set_lfo_type.set(osc);
-                                        })
+                                    <button
+                                        class=""
+                                        on:click=move |_| {
+                                            spawn_local(async move {
+                                                invoke(
+                                                    "set_lfo_osc",
+                                                    to_value(&LfoSetOscType { id: index, osc_type: osc }).unwrap(),
+                                                )
+                                                .await;
+                                                set_lfo_type.set(osc);
+                                            })
                                     }>
                                         { move ||
                                             if osc == lfo_type.get() {
                                                 format!("- [x] {osc:?}")
+                                                // view! {
+                                                //     <div> { format!("- [x]") } </div>
+                                                //     <div> { format!("{osc:?}") } </div>
+                                                // }
                                             } else {
                                                 format!("- [ ] {osc:?}")
+                                                // view! {
+                                                //     <div> { format!("- [ ]") } </div>
+                                                //     <div> { format!("{osc:?}") } </div>
+                                                // }
                                             }
                                         }
                                     </button>
@@ -348,7 +362,7 @@ fn VCO() -> impl IntoView {
                 </div>
 
                 // oscillator type indicator
-                <div class="grid grid-flex-row">
+                <div class="grid grid-flex-row text-left">
                     <For
                         each=move || OscType::iter()
                         key=move |key| (key.clone(), *key == vco_type.get())
@@ -356,6 +370,7 @@ fn VCO() -> impl IntoView {
                             view! {
                                 <div>
                                     <button on:click=move |_| {
+                                        set_overtones.set(true);
                                         spawn_local(async move {
                                             invoke(
                                                 "set_vco_osc",
@@ -414,14 +429,10 @@ fn EnvFilter() -> impl IntoView {
             })
         };
 
-        // if env_type.get() != FilterType::OC {
         view! {
             <p> "attack" </p>
             <Slider on_input=Box::new(set_attack)/>
         }
-        // } else {
-        //     nothing()
-        // }
     };
 
     let decay = move || {
@@ -435,14 +446,10 @@ fn EnvFilter() -> impl IntoView {
             })
         };
 
-        // if env_type.get() != FilterType::OC {
         view! {
             <p> "decay" </p>
             <Slider on_input=Box::new(set_decay)/>
         }
-        // } else {
-        //     nothing()
-        // }
     };
 
     let sustain = move || {
@@ -466,56 +473,14 @@ fn EnvFilter() -> impl IntoView {
         }
     };
 
-    // let display_break = move || {
-    //     let set_break = move |ev| {
-    //         spawn_local(async move {
-    //             invoke(
-    //                 "set_env_break",
-    //                 to_value(&EnvSetArgs {
-    //                     value: event_target_value(&ev).parse().unwrap(),
-    //                 })
-    //                 .unwrap(),
-    //             )
-    //             .await;
-    //         })
-    //     };
-    //
-    //     if env_type.get() == FilterType::ADBDR {
-    //         view! {
-    //             <p> "break" </p>
-    //             <Slider on_input=Box::new(set_break)/>
-    //         }
-    //     } else {
-    //         nothing()
-    //     }
-    // };
-
-    // let decay_2 = move || {
-    //     let set_decay = move |ev| {
-    //         spawn_local(async move {
-    //             invoke(
-    //                 "set_env_decay_2",
-    //                 to_value(&EnvSetArgs {
-    //                     value: event_target_value(&ev).parse().unwrap(),
-    //                 })
-    //                 .unwrap(),
-    //             )
-    //             .await;
-    //         })
-    //     };
-    //
-    //     if env_type.get() == FilterType::ADBDR {
-    //         view! {
-    //             <p> "decay 2" </p>
-    //             <Slider on_input=Box::new(set_decay)/>
-    //         }
-    //     } else {
-    //         nothing()
-    //     }
-    // };
-
     let cutoff = move || {
         let set_cutoff = move |pos| {
+            let pos = if pos == SliderVal::MIN {
+                SliderVal::MIN * 2.0
+            } else {
+                pos
+            };
+
             spawn_local(async move {
                 invoke(
                     "set_env_cutoff",
@@ -556,42 +521,9 @@ fn EnvFilter() -> impl IntoView {
                     { attack }
                     { decay }
                     { sustain }
-                    // { display_break }
-                    // { decay_2 }
                     { cutoff }
                     { resonance }
                 </div>
-
-                // <div>
-                    // <For
-                    //     each=move || FilterType::iter()
-                    //     key=move |key| (key.clone(), *key == env_type.get())
-                    //     children=move |env| {
-                    //         view! {
-                    //             <div>
-                    //                 <button on:click=move |_| {
-                    //                     spawn_local(async move {
-                    //                         invoke(
-                    //                             "set_env",
-                    //                             to_value(&VcoSetEnvType { env_type: env }).unwrap(),
-                    //                         )
-                    //                         .await;
-                    //                         set_env_type.set(env);
-                    //                     })
-                    //                 }>
-                    //                     { move ||
-                    //                         if env == env_type.get() {
-                    //                             format!("- [x] {env:?}")
-                    //                         } else {
-                    //                             format!("- [ ] {env:?}")
-                    //                         }
-                    //                     }
-                    //                 </button>
-                    //             </div>
-                    //         }
-                    //     }
-                    // />
-                // </div>
             </div>
         </div>
     }

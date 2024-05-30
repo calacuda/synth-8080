@@ -18,7 +18,7 @@ pub struct AllPassFilter {
 
 impl AllPassFilter {
     pub fn new() -> Self {
-        let cutoff = 9_950.0;
+        let cutoff = 3_000.0;
         Self {
             cutoff,
             base_cutoff: cutoff,
@@ -26,7 +26,7 @@ impl AllPassFilter {
             env: 0.0,
             a1: 0.0,
             highpass: false,
-            base_resonance: 1.0,
+            base_resonance: 0.5,
             resonance: 0.5,
             wiggle_discount: 0.2,
         }
@@ -38,7 +38,7 @@ impl AllPassFilter {
     }
 
     pub fn wiggle_cutoff(&mut self, wiggle_amount: Float) {
-        self.cutoff = self.base_cutoff + (12_000.0 * wiggle_amount) + 100.0;
+        self.cutoff = self.base_cutoff + (5_000.0 * wiggle_amount) + 100.0;
         // trace!(
         //     "base_cutoff: {} | cutoff: {}, | wiggle: {}",
         //     self.base_cutoff,
@@ -88,7 +88,7 @@ impl Filter for AllPassFilter {
     /// takes a number between 0 and 1.0
     fn set_cutoff(&mut self, cutoff: Float) {
         // trace!("input cutoff: {cutoff}");
-        let cutoff = (cutoff * 12_000.0) + 100.0;
+        let cutoff = (cutoff * 5_000.0) + 100.0;
         self.cutoff = cutoff;
         self.base_cutoff = cutoff;
         // trace!("set cutoff to: {}", self.cutoff);
@@ -114,13 +114,13 @@ pub struct LowPassFilter {
 
 impl LowPassFilter {
     pub fn new() -> Self {
-        let low_pass_settings = BiquadCoefs::lowpass(SAMPLE_RATE as Float, 0.5, 6_000.0);
+        let low_pass_settings = BiquadCoefs::lowpass(SAMPLE_RATE as f32, 0.5, 3_000.0);
         let mut filter = Biquad::new();
         filter.set_coefs(low_pass_settings);
 
         Self {
-            cutoff: 6_000.0,
-            base_cutoff: 6_000.0,
+            cutoff: 3_000.0,
+            base_cutoff: 3_000.0,
             resonance: 0.5,
             base_resonance: 0.5,
             env: 0.0,
@@ -129,7 +129,7 @@ impl LowPassFilter {
     }
 
     pub fn wiggle_cutoff(&mut self, wiggle_amount: Float) {
-        self.cutoff = self.base_cutoff + (10_000.0 * wiggle_amount);
+        self.cutoff = self.base_cutoff + (5_000.0 * wiggle_amount);
         // trace!(
         //     "base_cutoff: {} | cutoff: {}, | wiggle: {}",
         //     self.base_cutoff,
@@ -145,8 +145,11 @@ impl LowPassFilter {
         //     "using cutoff: {}, and resonance: {}.",
         //     self.cutoff, self.resonance
         // );
-        let low_pass_settings =
-            BiquadCoefs::lowpass(SAMPLE_RATE as Float, self.resonance, self.cutoff);
+        let low_pass_settings = BiquadCoefs::lowpass(
+            SAMPLE_RATE as f32,
+            self.resonance as f32,
+            self.cutoff as f32,
+        );
         let mut filter = Biquad::new();
         filter.set_coefs(low_pass_settings);
 
@@ -171,7 +174,7 @@ impl Filter for LowPassFilter {
     }
 
     fn set_cutoff(&mut self, cutoff: Float) {
-        let cutoff = (cutoff * 12_000.0);
+        let cutoff = (cutoff * 5_000.0);
 
         self.cutoff = cutoff;
         self.base_cutoff = cutoff;

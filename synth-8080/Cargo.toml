@@ -11,6 +11,7 @@ HiFi = [ "lib/HiFi" ]
 # HiFi = ["double_float", "wav_sample_rate"]
 double_float = [ "lib/double_float" ]
 wav_sample_rate = [ "lib/wav_sample_rate" ]
+allpass = []
 
 [profile.dev]
 incremental = true

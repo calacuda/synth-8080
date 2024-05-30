@@ -119,6 +119,9 @@ impl MIDIControls {
         if ports.len() > 1 {
             let in_port = ports[1].0.clone();
             self.connect_to_port(in_port)?;
+        } else {
+            let in_port = ports[0].0.clone();
+            self.connect_to_port(in_port)?;
         }
         // .into_iter()
         // .map(|port| self.connect_to_port(port.0))

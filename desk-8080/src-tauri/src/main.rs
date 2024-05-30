@@ -163,7 +163,7 @@ fn set_output_volume(synth: State<'_, Arc<Controller>>, volume: Float) {
 #[tauri::command]
 fn set_reverb_gain(synth: State<'_, Arc<Controller>>, volume: Float) {
     // Gain control of Reverb is an f32 (as mandated by the library)
-    let v: f32 = volume.into();
+    let v: f32 = volume as f32;
 
     synth.modules.lock().unwrap().reverb[0].gain = v;
 }
@@ -549,10 +549,10 @@ async fn main() {
         }
     };
 
-    // _ = synth.connect(1, 0, 4, chorus::AUDIO_INPUT);
+    _ = synth.connect(1, 0, 4, chorus::AUDIO_INPUT);
     // _ = synth.connect(1, 0, 7, reverb::AUDIO_INPUT);
     // _ = synth.connect(7, 0, 0, 0);
-    // _ = synth.connect(4, 0, 0, 0);
+    _ = synth.connect(4, 0, 0, 0);
 
     // mco => chorus => echo => output
     // _ = synth.connect(1, 0, 4, chorus::AUDIO_INPUT);
@@ -560,16 +560,16 @@ async fn main() {
     // _ = synth.connect(3, 0, 0, 0);
 
     // mco => chorus => echo => overdrive => output
-    _ = synth.connect(1, 0, 4, chorus::AUDIO_INPUT);
-    _ = synth.connect(4, 0, 3, echo::AUDIO_INPUT);
-    _ = synth.connect(3, 0, 6, overdrive::AUDIO_INPUT);
-    _ = synth.connect(6, 0, 0, 0);
+    // _ = synth.connect(1, 0, 4, chorus::AUDIO_INPUT);
+    // _ = synth.connect(4, 0, 3, echo::AUDIO_INPUT);
+    // _ = synth.connect(3, 0, 6, overdrive::AUDIO_INPUT);
+    // _ = synth.connect(6, 0, 0, 0);
 
     // _ = synth.connect(1, 0, 0, 0);
 
     {
         synth.output.lock().unwrap().set_volume(0.5);
-        synth.modules.lock().unwrap().mco[0].set_volume(0.5);
+        // synth.modules.lock().unwrap().mco[0].set_volume(0.5);
     }
 
     tauri::Builder::default()

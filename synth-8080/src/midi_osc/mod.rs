@@ -167,14 +167,14 @@ impl MidiOsc {
         self.oscs
             .iter_mut()
             // .for_each(|(_vco, env)| env.allpass.set_cutoff(value));
-            .for_each(|(_vco, env)| env.lowpass.set_cutoff(value));
+            .for_each(|(_vco, env)| env.filter.set_cutoff(value));
     }
 
     pub fn set_resonance(&mut self, value: Float) {
         self.oscs
             .iter_mut()
             // .for_each(|(_vco, env)| env.allpass.set_resonance(value));
-            .for_each(|(_vco, env)| env.lowpass.set_resonance(value));
+            .for_each(|(_vco, env)| env.filter.set_resonance(value));
     }
 }
 
