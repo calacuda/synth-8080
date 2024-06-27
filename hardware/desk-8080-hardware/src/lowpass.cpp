@@ -30,18 +30,18 @@ void lowpass_set_values(JsonDocument json) {
 // }
 
 // knobs
-void lowpass_left_knob(RotaryEncoder::Direction encoder_direction) {
-    if (encoder_direction == RotaryEncoder::Direction::CLOCKWISE) {
+void lowpass_left_knob(int encoder_direction) {
+    if (encoder_direction > 0) {
         send_msg("lowpass", 0, "cutoff", true);
-    } else if (encoder_direction == RotaryEncoder::Direction::COUNTERCLOCKWISE) {
+    } else if (encoder_direction < 0) {
         send_msg("lowpass", 0, "cutoff", false);
     }
 }
 
-void lowpass_right_knob(RotaryEncoder::Direction encoder_direction) {
-    if (encoder_direction == RotaryEncoder::Direction::CLOCKWISE) {
+void lowpass_right_knob(int encoder_direction) {
+    if (encoder_direction > 0) {
         send_msg("lowpass", 0, "resonance", true);
-    } else if (encoder_direction == RotaryEncoder::Direction::COUNTERCLOCKWISE) {
+    } else if (encoder_direction < 0) {
         send_msg("lowpass", 0, "resonance", false);
     }
 }

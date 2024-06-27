@@ -7,7 +7,7 @@ use crate::{
 use anyhow::ensure;
 use crossbeam_channel::{unbounded, Receiver};
 use lib::{Connection, FilterType, Float, ModuleType};
-use rodio::OutputStreamHandle;
+use rodio::{OutputStreamHandle, Source};
 use std::sync::Mutex;
 use tracing::*;
 
@@ -27,7 +27,13 @@ pub struct Controller {
 impl Controller {
     pub async fn new(
         to_build: &[ModuleType],
-    ) -> anyhow::Result<(Self, (OutputStreamHandle, Audio))> {
+    ) -> anyhow::Result<(
+        Self,
+        (
+            OutputStreamHandle,
+            impl Source<Item = f32> + Iterator<Item = f32>,
+        ),
+    )> {
         let (tx, sync) = unbounded();
         let (output, jh) = output::Output::new(tx);
         let modules = Mutex::new(Modules::from(to_build));

@@ -41,6 +41,11 @@
             # rust-analyzer
             alsa-lib
             libudev-zero
+            # libasound
+            alsa-lib
+            alsa-utils
+            alsa-tools
+            alsa-oss
           ];
         };
       });

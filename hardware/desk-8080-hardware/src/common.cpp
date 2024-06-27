@@ -72,8 +72,21 @@ void send_msg(char mod[12] , uint8_t index, char control[50], bool increase) {
     doc["cmd"] = control;
     doc["increase"] = increase;
 
-    serializeJson(doc, Serial);
-    Serial.println();
+    serializeJson(doc, Serial1);
+    Serial1.println();
+}
+
+void send_msg(char mod[12] , uint8_t index, char control[50], double ammount) {
+    // print json to Serial
+    JsonDocument doc;
+
+    doc["mod"] = mod;
+    doc["index"] = index;
+    doc["cmd"] = control;
+    doc["value"] = ammount;
+
+    serializeJson(doc, Serial1);
+    Serial1.println();
 }
 
 void send_msg(char mod[12] , uint8_t index, char control[50]) {
@@ -84,8 +97,8 @@ void send_msg(char mod[12] , uint8_t index, char control[50]) {
     doc["index"] = index;
     doc["cmd"] = control;
 
-    serializeJson(doc, Serial);
-    Serial.println();
+    serializeJson(doc, Serial1);
+    Serial1.println();
 }
 
 void send_msg(char mod[12] , uint8_t index) {
@@ -110,8 +123,8 @@ void send_log(char log[2000]) {
 
     doc["log-message"] = log;
 
-    serializeJson(doc, Serial);
-    Serial.println();
+    serializeJson(doc, Serial1);
+    Serial1.println();
 
     // Serial.println("JSON?");
 }

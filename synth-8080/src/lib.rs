@@ -5,7 +5,7 @@ use lib::ModuleType;
 pub use lib::{Float, SAMPLE_RATE};
 use log::error;
 use output::Audio;
-use rodio::OutputStreamHandle;
+use rodio::{OutputStreamHandle, Source};
 use std::{future::Future, mem::size_of, sync::Arc, task::Poll};
 pub use tokio::spawn;
 use tracing::*;
@@ -138,7 +138,13 @@ pub fn default_modules() -> Vec<ModuleType> {
 
 pub async fn mk_synth(
     modules: &[ModuleType],
-) -> Result<(Arc<controller::Controller>, (OutputStreamHandle, Audio))> {
+) -> Result<(
+    Arc<controller::Controller>,
+    (
+        OutputStreamHandle,
+        impl Source<Item = f32> + Iterator<Item = f32>,
+    ),
+)> {
     // TODO: read config
 
     // let (raw_ctrlr, _audio_handle) = controller::Controller::new(&modules).await.map_or_else(

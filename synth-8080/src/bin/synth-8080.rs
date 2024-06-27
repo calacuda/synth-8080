@@ -300,15 +300,17 @@ pub async fn main() -> Result<()> {
         }
     };
 
-    stream_handle.play_raw(audio_struct)?;
+    stream_handle.play_raw(audio_struct).unwrap();
     info!("playing audio struct");
 
     #[cfg(feature = "hardware")]
-    let audio_out_thread = {
+    // let audio_out_thread = {
+    {
         let audio_out_thread = spawn(audio_gen);
         // #[cfg(feature = "hardware")]
-        HardwareControls::new(ctrlr.clone())?.await;
-        audio_out_thread
+        // HardwareControls::new(ctrlr.clone())?.await;
+        audio_out_thread.await;
+        // audio_out_thread
     };
 
     #[cfg(not(feature = "hardware"))]
@@ -319,10 +321,10 @@ pub async fn main() -> Result<()> {
 
     warn!("stopping syntheses");
 
-    #[cfg(feature = "hardware")]
-    {
-        audio_out_thread.abort();
-    }
+    // #[cfg(feature = "hardware")]
+    // {
+    //     // audio_out_thread.abort();
+    // }
 
     info!("syntheses stopped");
 

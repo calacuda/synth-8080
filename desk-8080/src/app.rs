@@ -724,6 +724,13 @@ fn Connections() -> impl IntoView {
                 )
                 .await;
                 console_log("connected");
+                set_src_mod_type.set(None);
+                set_src_mod_index.set(0);
+                set_src_mod_output.set(0);
+
+                set_dest_mod_type.set(None);
+                set_dest_mod_index.set(0);
+                set_dest_mod_input.set(0);
             });
 
             spawn_local(async move {
@@ -733,14 +740,6 @@ fn Connections() -> impl IntoView {
                 );
                 console_log("refreshed list");
             });
-
-            set_src_mod_type.set(None);
-            set_src_mod_index.set(0);
-            set_src_mod_output.set(0);
-
-            set_dest_mod_type.set(None);
-            set_dest_mod_index.set(0);
-            set_dest_mod_input.set(0);
         }
     };
 

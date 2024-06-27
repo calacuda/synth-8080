@@ -9,8 +9,8 @@
 
 typedef void (*DisplayFunc)();
 typedef void (*SetValuesFunc)(JsonDocument json);
-typedef void (*LeftKnobFunc)(RotaryEncoder::Direction encoder_direction);
-typedef void (*RightKnobFunc)(RotaryEncoder::Direction encoder_direction);
+typedef void (*LeftKnobFunc)(int encoder_direction);
+typedef void (*RightKnobFunc)(int encoder_direction);
 typedef void (*LeftKnobHoldFunc)();
 typedef void (*RightKnobHoldFunc)();
 
@@ -32,6 +32,7 @@ void display_right_knob(char *knob_name, double value);
 void display_header(char *header);
 // void two_knobs(String header, String left_knob_name, double left_knob_val, String right_knob_name, double right_knob_val);
 void send_msg(char *mod, uint8_t index, char *control, bool increase);
+void send_msg(char *mod, uint8_t index, char *control, double amount);
 void send_msg(char *mod, uint8_t index, char *control);
 void send_msg(char *mod, uint8_t index);
 void send_msg(char *mod);

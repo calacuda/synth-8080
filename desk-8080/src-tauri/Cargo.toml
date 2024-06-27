@@ -28,6 +28,7 @@ custom-protocol = ["tauri/custom-protocol"]
 HiFi = [ "synth-8080/HiFi", "synth-8080-lib/HiFi" ]
 double_float = [ "synth-8080/double_float", "synth-8080-lib/double_float" ]
 wav_sample_rate = [ "synth-8080/wav_sample_rate", "synth-8080-lib/wav_sample_rate" ]
+hardware = [ "synth-8080/hardware" ]
 
 # All dependencies (but not this crate itself or any workspace member)
 # will be compiled with -Copt-level=2 . This includes build dependencies.

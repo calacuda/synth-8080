@@ -16,7 +16,7 @@ pub struct HardwareControls {
 
 impl HardwareControls {
     pub fn new(controller: Arc<super::Controller>) -> anyhow::Result<Self> {
-        let serial = Mutex::new(serialport::new("/dev/ttyACM0", 115200).open()?);
+        let serial = Mutex::new(serialport::new("/dev/ttyACM1", 115200).open()?);
         serial
             .lock()
             .unwrap()

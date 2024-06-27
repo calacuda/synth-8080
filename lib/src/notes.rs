@@ -504,6 +504,7 @@ impl Display for Note {
 
 impl From<u8> for Note {
     fn from(value: u8) -> Self {
-        Self::iter().collect::<Vec<Note>>()[(value - 12) as usize]
+        // println!("playing note {value}, {}");
+        Self::iter().collect::<Vec<Note>>()[value as usize]
     }
 }

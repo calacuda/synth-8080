@@ -39,20 +39,20 @@ void mco_hold_press() {
 }
 
 // knobs
-void mco_left_knob(RotaryEncoder::Direction encoder_direction) {
+void mco_left_knob(int encoder_direction) {
     // output volume
-    if (encoder_direction == RotaryEncoder::Direction::CLOCKWISE) {
+    if (encoder_direction > 0) {
         send_msg("MCO", 0, "vol", true);
-    } else if (encoder_direction == RotaryEncoder::Direction::COUNTERCLOCKWISE) {
+    } else if (encoder_direction < 0) {
         send_msg("MCO", 0, "vol", false);
     }
 }
 
-void mco_right_knob(RotaryEncoder::Direction encoder_direction) {
+void mco_right_knob(int encoder_direction) {
     // change wave form
-    if (encoder_direction == RotaryEncoder::Direction::CLOCKWISE) {
+    if (encoder_direction > 0) {
         send_msg("MCO", 0, "wave-form-next");
-    } else if (encoder_direction == RotaryEncoder::Direction::COUNTERCLOCKWISE) {
+    } else if (encoder_direction < 0) {
         send_msg("MCO", 0, "wave-form-prev");
     }
 }

@@ -30,22 +30,41 @@
 #define RIGHT_CLK_PIN 10
 #define RIGHT_DT_PIN 11
 #define LEFT_BUTTON_PIN 12  
-#define RIGHT_BUTTON_PIN 13 
+#define RIGHT_BUTTON_PIN 13
+#define I2S_BCLK_PIN 21
+#define I2S_DATA_PIN 20
+#define I2S_MCLK_PIN 19
+
+#define ATTACK_PIN 28
+#define DECAY_PIN 27
+#define SUSTAIN_PIN 26
 
 // int screen_middle[2] = { screen_size_x / 2, screen_size_y / 2 };
 bool connected;
 OneButton button(BUTTON_PIN);
 // REncoder left_encoder(LEFT_CLK_PIN, LEFT_DT_PIN);
 // REncoder right_encoder(RIGHT_CLK_PIN, RIGHT_DT_PIN);
-RotaryEncoder left_encoder(LEFT_CLK_PIN, LEFT_DT_PIN, RotaryEncoder::LatchMode::TWO03);
-RotaryEncoder right_encoder(RIGHT_CLK_PIN, RIGHT_DT_PIN, RotaryEncoder::LatchMode::TWO03);
+// RotaryEncoder left_encoder(LEFT_CLK_PIN, LEFT_DT_PIN, RotaryEncoder::LatchMode::TWO03);
+// RotaryEncoder right_encoder(RIGHT_CLK_PIN, RIGHT_DT_PIN, RotaryEncoder::LatchMode::TWO03);
+// A pointer to the dynamic created rotary encoder instance.
+// This will be done in setup()
+RotaryEncoder *left_encoder = nullptr;
+RotaryEncoder *right_encoder = nullptr;
 
 OneButton left_button(LEFT_BUTTON_PIN);
 OneButton right_button(RIGHT_BUTTON_PIN);
 // REncoder::Event left_knob_history[2];
 // REncoder::Event right_knob_history[2];
-int left_pos;
-int right_pos;
+double attack = 0.0;
+double decay = 0.0;
+double sustain = 0.0;
+
+// long sample = 0;
+int sample = 0;
+uint8_t sample_bytes[10];
+bool play;
+
+I2S audio(OUTPUT);
 
 struct Tabs {
     Tab tabs[N_TABS];
@@ -58,8 +77,9 @@ void request_data();
 
 void wait_for_con() {
     u8g2.clearBuffer();
+    u8g2.sendBuffer();
 
-    while (!Serial) {
+    while (!Serial1) {
         analogWrite(LED_PIN, 0);
         delay(750);
         analogWrite(LED_PIN, 1);
@@ -67,6 +87,7 @@ void wait_for_con() {
     }
 
     analogWrite(LED_PIN, 1);
+    // analogWrite(LED_PIN, 0);
     connected = true;
 
     request_data();
@@ -80,37 +101,25 @@ void display_tab() {
 }
 
 void knobs() {
-    // REncoder::Event encoder_ev_left = left_encoder.reState();
-    // REncoder::Event encoder_ev_right = right_encoder.reState();
+    tabs.tabs[tabs.i].left_knob((int) left_encoder->getDirection());
 
-    // if (left_encoder.getPosition() % 2) {
-    //     tabs.tabs[tabs.i].left_knob(encoder_ev_left);
-    // }
-    // if (right_encoder.getPosition() % 2) {
-    //     tabs.tabs[tabs.i].right_knob(encoder_ev_right);
-    // }
-    left_encoder.tick();
-    right_encoder.tick();
+    tabs.tabs[tabs.i].right_knob((int) right_encoder->getDirection());
 
-    int new_left_pos = left_encoder.getPosition();
-    int new_right_pos = right_encoder.getPosition();
+    double attack_mesurement = 1.0 - analogRead(ATTACK_PIN) / 1023.0;
+    double decay_mesurement = 1.0 - analogRead(DECAY_PIN) / 1023.0;
+    double sustain_mesurement = 1.0 - analogRead(SUSTAIN_PIN) / 1023.0;
+    // Serial.println(attack_mesurement);
 
-    if (left_pos != new_left_pos) {
-        // Serial.print("pos:");
-        // Serial.print(newPos);
-        // Serial.print(" dir:");
-        // Serial.println((int)(encoder.getDirection()));
-        tabs.tabs[tabs.i].left_knob(left_encoder.getDirection());
-        left_pos = new_left_pos;
+    if (abs(attack_mesurement - attack) > 1.0) {
+        send_msg("filter", 0, "set-attack", attack_mesurement);
     }
 
-    if (right_pos != new_right_pos) {
-        // Serial.print("pos:");
-        // Serial.print(newPos);
-        // Serial.print(" dir:");
-        // Serial.println((int)(encoder.getDirection()));
-        tabs.tabs[tabs.i].right_knob(right_encoder.getDirection());
-        right_pos = new_right_pos;
+    if (abs(decay_mesurement - decay) > 1.0) {
+        send_msg("filter", 0, "set-decay", decay_mesurement);
+    }
+
+    if (abs(sustain_mesurement - sustain) > 1.0) {
+        send_msg("filter", 0, "set-sustain", sustain_mesurement);
     }
 }
 
@@ -127,14 +136,14 @@ void hold() {
 }
 
 void read_serial_in() {
-    if (Serial.available()) {
+    if (Serial1.available()) {
         String json = Serial.readStringUntil('/n');
         JsonDocument doc;
 
         DeserializationError error = deserializeJson(doc, json);
 
         if (error) {
-            send_log("failed to deserialize the received JSON data");
+            send_log("[ERROR] failed to deserialize the received JSON data");
             return;
         }
 
@@ -201,14 +210,29 @@ void right_click() {
     request_data();
 }
 
-void setup() {
+void left_knob_check() {
+    left_encoder->tick(); // just call tick() to check the state.
+}
+
+void right_knob_check() {
+    right_encoder->tick(); // just call tick() to check the state.
+}
+
+void setup1() {
     // put your setup code here, to run once:
-    Serial.begin(115200);
+    Serial1.begin(115200);
     connected = false;
-    left_pos = 0;
-    right_pos = 0;
+
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
+
+    // PinMode rotary_mode = INPUT_PULLUP;
+    
+    // pinMode(LEFT_CLK_PIN, rotary_mode);
+    // pinMode(LEFT_DT_PIN, rotary_mode);
+    pinMode(ATTACK_PIN, INPUT);
+    pinMode(DECAY_PIN, INPUT);
+    pinMode(SUSTAIN_PIN, INPUT);
 
     Wire.begin();
 
@@ -240,12 +264,23 @@ void setup() {
     // right_encoder.setMinEncoderPosition(-2);
     // right_encoder.setMaxEncoderPosition(3);
 
-    // TODO: add second thread for audio.
+    left_encoder = new RotaryEncoder(LEFT_DT_PIN, LEFT_CLK_PIN, RotaryEncoder::LatchMode::FOUR0);
+
+    // register interrupt routine
+    attachInterrupt(digitalPinToInterrupt(LEFT_CLK_PIN), left_knob_check, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(LEFT_DT_PIN), left_knob_check, CHANGE);
+
+    right_encoder = new RotaryEncoder(RIGHT_DT_PIN, RIGHT_CLK_PIN, RotaryEncoder::LatchMode::FOUR0);
+
+    // register interrupt routine
+    attachInterrupt(digitalPinToInterrupt(RIGHT_CLK_PIN), right_knob_check, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(RIGHT_DT_PIN), right_knob_check, CHANGE);
+    // play = false;
 }
 
-void loop() {
+void loop1() {
     // put your main code here, to run repeatedly:
-    if (!connected) {
+    if (!Serial1) {
         // wait for connection
         wait_for_con();
     }
@@ -263,5 +298,125 @@ void loop() {
     // read serial input & set values
     read_serial_in();
 
-    delay(1);
+    // if (Serial.available() >= 4) {
+    //     uint8_t buf[10];
+    //     Serial.readBytes(buf, 4);
+
+    //     sample = (((long) buf[0]) << 24) + (((long) buf[1]) << 16) + (((long) buf[2]) << 8) + ((long) buf[3]);
+
+    //     // play = true;
+    //     // rp2040.fifo.push(sample);
+    //     audio.write32(sample, sample);
+    // }
+
+    // delay(1);
+}
+
+// int counter = 0;
+
+void setup() {
+    Serial.begin(921600); // 230400, 921600
+    // Serial.begin(115200);
+    // Serial.setTimeout(1000);
+
+    // set up i2s
+    audio.setBCLK(I2S_BCLK_PIN);
+    audio.setDATA(I2S_DATA_PIN);
+    audio.setMCLK(I2S_MCLK_PIN);
+    audio.setBitsPerSample(32);
+    audio.setFrequency(24000.0);
+    // audio.setMCLKmult(64);
+    // audio.setSysClk(24000);
+    // audio.swapClocks();
+    // audio.setLSBJFormat();
+    // Serial.print('\n');                           
+
+    // while (Serial.available() < 4) {}
+    // uint8_t buf[10];
+    Serial.readBytes(sample_bytes, 4);
+
+    // sample = (((int) buf[0]) << 8) + ((int) buf[1]);
+    sample = (((long) sample_bytes[0]) << 24) + (((long) sample_bytes[1]) << 16) + (((long) sample_bytes[2]) << 8) + ((long) sample_bytes[3]);
+
+    audio.begin();
+    // digitalWrite(LED_BUILTIN, LOW);
+    // new_sample();
+}
+
+void loop() {
+    // if (Serial.available() % 4 == 0 && Serial.available()) {
+    // while (Serial.available() >= 4) {
+        // I2S out
+        // new_sample();
+        // uint8_t buf[10];
+        // sample = 0;
+
+        // Serial.readBytes(buf, 4);
+
+        // sample = (((long) buf[0]) << 24) + (((long) buf[1]) << 16) + (((long) buf[2]) << 8) + ((long) buf[3]);
+    // if (Serial.available() >= 4) {
+        // uint8_t buf[10];
+        // Serial.readBytes(buf, 4);
+
+        // sample = (((long) buf[0]) << 24) + (((long) buf[1]) << 16) + (((long) buf[2]) << 8) + ((long) buf[3]);
+    // if (Serial.available() >= 4) {
+
+    //     play = true;
+    // }
+
+    // if (play) {
+        // play = false;
+        // audio.write32(sample, sample);
+    // }
+    // if (rp2040.fifo.available()) {
+        // long samp = long(rp2040.fifo.pop());
+
+    // uint8_t buf[10];
+    // Serial.readBytes(buf, 4);
+    // sample = (((long) buf[0]) << 24) + (((long) buf[1]) << 16) + (((long) buf[2]) << 8) + ((long) buf[3]);
+    
+    while (true) {   
+        // digitalWrite(LED_PIN, HIGH);
+
+        // audio.write(sample_bytes, 4);
+        // audio.write(sample_bytes, 4);
+        // // audio.flush();
+        // audio.write(sample, false);                               
+        // audio.write(sample, false);
+        audio.write32(sample, sample);
+        // TODO: send synth signal
+        // Serial.write('\n');                           
+        // audio.write32(0, 0);
+        
+        while (Serial.available() < 4) {}
+        // audio.flush();
+
+        // uint8_t buf[10];
+        Serial.readBytes(sample_bytes, 4);
+
+        // sample = (((int) buf[0]) << 8) + ((int) buf[1]);
+        long sample = (((long) sample_bytes[0]) << 24) + (((long) sample_bytes[1]) << 16) + (((long) sample_bytes[2]) << 8) + ((long) sample_bytes[3]);
+        // audio.flush();
+        // audio.write(sample, true);
+        // sample = new_sample;
+    }
+        // analogWrite(LED_PIN, 1);
+    // }
+
+        // audio.flush();
+    // } 
+        // audio.write(sample, true);
+        // delay(500);
+        // digitalWrite(LED_PIN, HIGH);
+        // delay(500);
+        // if (counter == 24000) {
+        //     digitalWrite(LED_PIN, HIGH);
+        // }
+        
+        // counter ++;
+    // }
+    // } else {
+        //  digitalWrite(LED_PIN, HIGH);
+        // digitalWrite(LED_BUILTIN, LOW);
+    // }
 }
