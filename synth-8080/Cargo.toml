@@ -20,15 +20,16 @@ incremental = true
 # incremental = true
 
 [dependencies]
-anyhow = "1.0.79"
-crossbeam-channel = "0.5.11"
+anyhow = "1.0.86"
+crossbeam-channel = "0.5.13"
 fon = "0.6.0"
 futures = "0.3.30"
 reverb = "1.0.47"
-rodio = "0.17.3"
-serde = { version = "1.0.196", features = ["derive"] }
-serialport = { version = "4.3.0", default-features = false }
-tokio = { version = "1.36.0", default-features = false, features = ["macros", "rt", "rt-multi-thread"] }
+# rodio = "0.17.3"
+rodio = "0.18.1"
+serde = { version = "1.0.203", features = ["derive"] }
+serialport = { version = "4.4.0", default-features = false }
+tokio = { version = "1.38.0", default-features = false, features = ["macros", "rt", "rt-multi-thread"] }
 tracing = { version = "0.1.40", features = ["async-await", "log", "log-always"] }
 tracing-subscriber = "0.3.18"
 twang = "0.9.0"
