@@ -7,7 +7,7 @@ use strum_macros::{EnumIter, EnumString};
 
 // TODO: move the flat note alias lines to infront of the sharp notes.
 
-#[derive(Debug, Clone, Deserialize, Serialize, Copy, PartialEq, Eq, EnumString, EnumIter)]
+#[derive(Debug, Clone, Deserialize, Serialize, Copy, PartialEq, Eq, EnumString, EnumIter, Hash)]
 pub enum Note {
     #[serde(alias = "c0", alias = "C0")]
     C0,
