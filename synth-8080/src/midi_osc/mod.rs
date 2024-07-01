@@ -63,6 +63,10 @@ impl MidiOsc {
             .for_each(|(vco, _env)| vco.set_overtones(on));
     }
 
+    pub fn is_playing(&mut self, note: Note) -> bool {
+        self.notes.contains(&Some(note))
+    }
+
     pub fn play_note(&mut self, note: Note) -> Result<()> {
         if self.notes.contains(&Some(note)) {
             bail!("{note} is already being played.");
@@ -105,7 +109,7 @@ impl MidiOsc {
             }
         }
 
-        bail!("note not found, unknown error ocured...");
+        bail!("note not found, or an unknown error ocured...");
     }
 
     pub fn set_wave_form(&mut self, wave_form: OscType) {
