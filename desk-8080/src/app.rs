@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "tauri"])]
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"])]
     async fn invoke(cmd: &str, args: JsValue) -> JsValue;
 }
 
@@ -714,6 +714,7 @@ fn Connections() -> impl IntoView {
     let connect = move |_| {
         if let (Some(src_mod), Some(dest_mod)) = (src_mod_type.get(), dest_mod_type.get()) {
             spawn_local(async move {
+                console_log("connecting");
                 invoke(
                     "connect",
                     to_value(&EditConnectionArgs {

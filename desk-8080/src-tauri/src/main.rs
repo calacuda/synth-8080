@@ -29,7 +29,7 @@ use synth_8080::{
     AudioGen, Float,
 };
 use synth_8080_lib::{FilterType, ModuleType};
-use tauri::{async_runtime::spawn, Manager, State, Window};
+use tauri::{async_runtime::spawn, Emitter, Manager, State, Window};
 use tracing::*;
 
 // pub mod graphs;
@@ -358,7 +358,7 @@ fn update_connection_list(window: Window, synth: State<'_, Arc<Controller>>) {
 
             if new_cons != connections {
                 info!("telling front end to updated connection list.");
-                window.emit_all("update-connections-list", ()).unwrap();
+                window.emit("update-connections-list", ()).unwrap();
             }
 
             connections = new_cons;

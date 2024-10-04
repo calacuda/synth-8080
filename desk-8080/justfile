@@ -1,11 +1,11 @@
 run:
-  cargo tauri dev -f "HiFi" --release
+  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo tauri dev -f "HiFi" --release
 
 dev:
-  cargo tauri dev
+  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo tauri dev
 
 release:
-  cargo tauri dev --release
+  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo tauri dev --release
 
 build:
   cargo tauri build -f "HiFi"
@@ -13,3 +13,15 @@ build:
 tailwind:
   npm list @catppuccin/tailwindcss > /dev/null || npm install -D @catppuccin/tailwindcss
   npx tailwindcss -i ./input.css -o ./styles.css --watch
+
+new-window NAME CMD:
+  tmux new-w -t desk-8080 -n "{{NAME}}"
+  tmux send-keys -t desk-8080:"{{NAME}}" "{{CMD}}" ENTER
+
+tmux:
+  tmux new -ds desk-8080 -n "README"
+  tmux send-keys -t desk-8080:README 'nv ./README.md "+set wrap"' ENTER
+  @just new-window "Edit" ""
+  @just new-window "Run" ""
+  @just new-window "git" "git status"
+  tmux a -t desk-8080
