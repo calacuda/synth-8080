@@ -1,4 +1,3 @@
-#![feature(exclusive_range_pattern)]
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use strum_macros::{EnumIter, EnumString};
@@ -55,6 +54,7 @@ pub enum ModuleType {
     OverDrive,
     Reverb,
     MCO, // Midi controlled Oscillator
+         // PMCO, // pollyphonic Midi Controlled Osc
 }
 
 impl Display for ModuleType {
@@ -70,6 +70,7 @@ impl Display for ModuleType {
             Self::OverDrive => write!(f, "OD"),
             Self::Reverb => write!(f, "Reverb"),
             Self::MCO => write!(f, "MCO"),
+            // Self::PMCO => write!(f, "PMCO"),
             // Self:: => write!(f, ""),
         }
     }

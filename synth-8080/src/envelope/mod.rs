@@ -1,9 +1,8 @@
-use std::f32::NAN;
-
 use crate::{common::Module, Float};
 use anyhow::Result;
 use lib::FilterType;
 use log::info;
+use std::f32::NAN;
 use tracing::*;
 
 use self::allpass::{AllPassFilter, LowPassFilter};

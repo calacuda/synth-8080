@@ -24,7 +24,7 @@ pub struct MidiOsc {
 
 impl Default for MidiOsc {
     fn default() -> Self {
-        Self::new(4)
+        Self::new(10)
     }
 }
 

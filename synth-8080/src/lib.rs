@@ -1,10 +1,10 @@
-#![feature(exclusive_range_pattern, let_chains)]
+#![feature(let_chains)]
 use anyhow::{bail, Result};
 use common::Module;
 use lib::ModuleType;
 pub use lib::{Float, SAMPLE_RATE};
 use log::error;
-use output::Audio;
+// use output::Audio;
 use rodio::{OutputStreamHandle, Source};
 use std::{future::Future, mem::size_of, sync::Arc, task::Poll};
 pub use tokio::spawn;
@@ -26,6 +26,7 @@ pub mod midi_osc;
 pub mod osc;
 pub mod output;
 pub mod overdrive;
+// pub mod poly_midi_osc;
 pub mod reverb;
 pub mod router;
 pub mod vco;

@@ -254,10 +254,12 @@ impl Filter for LowPassFilter {
         // maybe change to minus
         // self.resonance = (env * 0.5 + 1.0);
         // let res = env;
-        // self.set_resonance(self.base_resonance * res);
+        // self.set_resonance(self.base_resonance * self.env);
         // self.wiggle_cutoff(env);
         // info!("resonance => {}", self.resonance);
-        // self.recalculate();
+        self.resonance = self.base_resonance * self.env;
+
+        self.recalculate();
     }
 
     fn get_sample(&mut self, audio_in: Float) -> Float {
