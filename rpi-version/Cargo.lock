@@ -1423,6 +1423,8 @@ name = "synth-pi"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "serde",
+ "strum",
  "synth-8080",
  "synth-8080-lib",
  "tokio",

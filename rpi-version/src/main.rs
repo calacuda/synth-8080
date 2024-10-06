@@ -1,6 +1,5 @@
-use std::sync::Arc;
-
 use anyhow::Result;
+use std::sync::Arc;
 use synth_8080::{
     chorus,
     controller::{midi::MIDIControls, Controller},
@@ -9,6 +8,8 @@ use synth_8080::{
 use synth_8080_lib::ModuleType;
 use tokio::spawn;
 use tracing::*;
+
+mod communications;
 
 fn start_midi(synth: Arc<Controller>) -> Result<MIDIControls> {
     let mut midi_con = MIDIControls::new(synth)?;
