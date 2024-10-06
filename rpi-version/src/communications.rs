@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use serde::{de::value, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{fmt::Display, io::Write, sync::Arc};
 use strum::{EnumIter, IntoEnumIterator};
 use synth_8080::Float;
@@ -62,9 +62,9 @@ impl From<u8> for Param {
 pub enum CtrlInputMesg {
     SetParam(Param, Float),
     Mute(bool),
-    ConLfoTo(Param),
+    // ConLfoTo(Param),
     GetParam(Param),
-    GetLfoCon,
+    // GetLfoCon,
 }
 
 impl CtrlInputMesg {
@@ -105,16 +105,16 @@ impl TryFrom<Vec<u8>> for CtrlInputMesg {
                     ))
                 } else if mesg_type.starts_with("Mute") {
                     Ok(Self::Mute(value[i] > 0))
-                } else if mesg_type.starts_with("ConLfoTo") {
-                    let (param, _i) = Self::parse_param(value, i);
-
-                    Ok(Self::ConLfoTo(param))
+                // } else if mesg_type.starts_with("ConLfoTo") {
+                //     let (param, _i) = Self::parse_param(value, i);
+                //
+                //     Ok(Self::ConLfoTo(param))
                 } else if mesg_type.starts_with("GetParam") {
                     let (param, _i) = Self::parse_param(value, i);
 
                     Ok(Self::GetParam(param))
-                } else if mesg_type.starts_with("GetLfoCon") {
-                    Ok(Self::GetLfoCon)
+                // } else if mesg_type.starts_with("GetLfoCon") {
+                //     Ok(Self::GetLfoCon)
                 } else {
                     bail!("unknown Input message recieved")
                 }
@@ -126,11 +126,16 @@ impl TryFrom<Vec<u8>> for CtrlInputMesg {
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum CtrlResponseMesg {
+    /// what param was set
     SetSuccess(Param),
+    /// if the synth is muted
     Muted(bool),
-    LfoConSuccess(Param),
-    ParamVal(Param),
-    LfoCon(Param),
+    // /// Lfo Connected to param success
+    // LfoConSuccess(Param),
+    /// a parameters value
+    ParamVal(Param, f32),
+    // /// tells the controller what the lfo is wired to
+    // LfoCon(Param),
 }
 
 impl Display for CtrlResponseMesg {
@@ -138,9 +143,9 @@ impl Display for CtrlResponseMesg {
         match self {
             Self::SetSuccess(_) => write!(f, "SetSuccess"),
             Self::Muted(_) => write!(f, "Muted"),
-            Self::LfoConSuccess(_) => write!(f, "LfoConSucces"),
-            Self::ParamVal(_) => write!(f, "ParamVal"),
-            Self::LfoCon(_) => write!(f, "LfoCon"),
+            // Self::LfoConSuccess(_) => write!(f, "LfoConSucces"),
+            Self::ParamVal(_, _) => write!(f, "ParamVal"),
+            // Self::LfoCon(_) => write!(f, "LfoCon"),
         }
     }
 }
@@ -162,26 +167,42 @@ impl ToMessage for CtrlResponseMesg {
                 f.push((*param).into());
                 f.push('\n' as u8);
             }
-            Self::LfoConSuccess(param) => {
-                write!(f, "LfoConSucces")?;
-                f.push(0);
-                f.push((*param).into());
-                f.push('\n' as u8);
-            }
-            Self::ParamVal(param) => {
+            // Self::LfoConSuccess(param) => {
+            //     write!(f, "LfoConSucces")?;
+            //     f.push(0);
+            //     f.push((*param).into());
+            //     f.push('\n' as u8);
+            // }
+            Self::ParamVal(param, val) => {
                 write!(f, "ParamVal")?;
                 f.push(0);
                 f.push((*param).into());
-                f.push('\n' as u8);
-            }
-            Self::LfoCon(param) => {
-                write!(f, "LfoCon")?;
                 f.push(0);
-                f.push((*param).into());
+                f.append(&mut val.to_le_bytes().to_vec());
                 f.push('\n' as u8);
-            }
+            } // Self::LfoCon(param) => {
+              //     write!(f, "LfoCon")?;
+              //     f.push(0);
+              //     f.push((*param).into());
+              //     f.push('\n' as u8);
+              // }
         }
 
         Ok(f)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn responce_message_ser() {
+        // TODO: Write
+        todo!();
+    }
+
+    #[test]
+    fn input_message_deser() {
+        // TODO: Write
+        todo!();
     }
 }
