@@ -226,7 +226,7 @@ impl LowPassFilter {
     }
 
     pub fn wiggle_cutoff(&mut self, wiggle_amount: Float) {
-        self.cutoff = self.base_cutoff + (5_000.0 * wiggle_amount);
+        self.cutoff = self.base_cutoff * wiggle_amount;
         // trace!(
         //     "base_cutoff: {} | cutoff: {}, | wiggle: {}",
         //     self.base_cutoff,
@@ -255,11 +255,11 @@ impl Filter for LowPassFilter {
         // self.resonance = (env * 0.5 + 1.0);
         // let res = env;
         // self.set_resonance(self.base_resonance * self.env);
-        // self.wiggle_cutoff(env);
+        self.wiggle_cutoff(env);
         // info!("resonance => {}", self.resonance);
-        self.resonance = self.base_resonance * self.env;
+        // self.resonance = self.base_resonance * self.env;
 
-        self.recalculate();
+        // self.recalculate();
     }
 
     fn get_sample(&mut self, audio_in: Float) -> Float {
@@ -269,7 +269,7 @@ impl Filter for LowPassFilter {
     }
 
     fn set_cutoff(&mut self, cutoff: Float) {
-        let cutoff = cutoff * 5_000.0;
+        let cutoff = cutoff * 1_750.0;
 
         self.cutoff = cutoff;
         self.base_cutoff = cutoff;
@@ -279,6 +279,7 @@ impl Filter for LowPassFilter {
     fn set_resonance(&mut self, resonance: Float) {
         // let scaler = 19_950.0;
         let res = resonance * 0.75;
+        // let res = resonance;
         // info!("{resonance} => {res}");
 
         self.resonance = res;
