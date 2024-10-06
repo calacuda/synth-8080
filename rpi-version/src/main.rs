@@ -71,6 +71,7 @@ async fn main() {
         // synth.modules.lock().unwrap().mco[0].set_volume(0.5);
     };
 
+    // TODO: read serial input in a loop
     if let Err(e) = audio_gen_thread.await {
         error!("failed to start synth: {e}");
     };
