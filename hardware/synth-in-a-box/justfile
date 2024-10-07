@@ -1,0 +1,13 @@
+tmux:
+  tmux new -ds synth-box -n "README"
+  tmux send-keys -t synth-box:README 'nv ./README.md "+set wrap"' ENTER
+  @just new-window "Reff" ""
+  @just new-window "Edit" ""
+  @just new-window "Run" ""
+  @just new-window "git" "git status"
+  tmux a -t synth-box
+
+new-window NAME CMD:
+  tmux new-w -t synth-box -n "{{NAME}}"
+  tmux send-keys -t synth-box:"{{NAME}}" "{{CMD}}" ENTER
+
