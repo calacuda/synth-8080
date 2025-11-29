@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
 use std::str::FromStr;
 use strum::IntoEnumIterator;
-use synth_8080_lib::{FilterType, ModuleType, OscType, notes::Note};
+use synth_8080_lib::{FilterType, ModuleType, OscType};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -15,10 +15,10 @@ extern "C" {
 pub const SLIDER_MAX: usize = 100_000;
 pub type SliderVal = f32;
 
-#[derive(Serialize, Deserialize)]
-struct PlayArgs {
-    note: Note,
-}
+// #[derive(Serialize, Deserialize)]
+// struct PlayArgs {
+//     note: Note,
+// }
 
 #[derive(Serialize, Deserialize)]
 struct LfoStateArgs {
@@ -61,10 +61,10 @@ struct EnvSetArgs {
     value: SliderVal,
 }
 
-#[derive(Serialize, Deserialize)]
-struct VcoSetEnvType {
-    env_type: FilterType,
-}
+// #[derive(Serialize, Deserialize)]
+// struct VcoSetEnvType {
+//     env_type: FilterType,
+// }
 
 #[derive(Serialize, Deserialize)]
 struct EditConnectionArgs {
@@ -277,8 +277,8 @@ fn LFOs() -> impl IntoView {
 #[component]
 fn VCO() -> impl IntoView {
     // make signal for LFO state
-    let (vco_type, set_vco_type) = create_signal(OscType::Sine);
-    let (overtones, set_overtones) = create_signal(true);
+    let (vco_type, set_vco_type) = signal(OscType::Sine);
+    let (overtones, set_overtones) = signal(true);
 
     spawn_local(async move {
         set_vco_type.set(
@@ -400,7 +400,7 @@ fn VCO() -> impl IntoView {
 
 #[component]
 fn EnvFilter() -> impl IntoView {
-    let (env_type, set_env_type) = create_signal(FilterType::ADSR);
+    let (env_type, set_env_type) = signal(FilterType::ADSR);
 
     spawn_local(async move {
         set_env_type.set(
@@ -468,8 +468,9 @@ fn EnvFilter() -> impl IntoView {
                 <p> "sustain" </p>
                 <Slider on_input=Box::new(set_sustain)/>
             }
+            .into_any()
         } else {
-            nothing()
+            nothing().into_any()
         }
     };
 
@@ -685,7 +686,7 @@ fn Reverb() -> impl IntoView {
 #[component]
 fn Connections() -> impl IntoView {
     let (connections, set_connections) =
-        create_signal(Vec::<(ModuleType, u8, usize, ModuleType, u8, usize)>::new());
+        signal(Vec::<(ModuleType, u8, usize, ModuleType, u8, usize)>::new());
 
     spawn_local(async move {
         set_connections.set(
@@ -694,15 +695,15 @@ fn Connections() -> impl IntoView {
         )
     });
 
-    let (src_mod_type, set_src_mod_type) = create_signal::<Option<ModuleType>>(None);
-    let (src_mod_index, set_src_mod_index) = create_signal::<usize>(0);
-    let (src_mod_output, set_src_mod_output) = create_signal::<u8>(0);
+    let (src_mod_type, set_src_mod_type) = signal::<Option<ModuleType>>(None);
+    let (src_mod_index, set_src_mod_index) = signal::<usize>(0);
+    let (src_mod_output, set_src_mod_output) = signal::<u8>(0);
 
-    let (dest_mod_type, set_dest_mod_type) = create_signal::<Option<ModuleType>>(None);
-    let (dest_mod_index, set_dest_mod_index) = create_signal::<usize>(0);
-    let (dest_mod_input, set_dest_mod_input) = create_signal::<u8>(0);
+    let (dest_mod_type, set_dest_mod_type) = signal::<Option<ModuleType>>(None);
+    let (dest_mod_index, set_dest_mod_index) = signal::<usize>(0);
+    let (dest_mod_input, set_dest_mod_input) = signal::<u8>(0);
 
-    // let (svg_src, set_svg_src) = create_signal(String::new());
+    // let (svg_src, set_svg_src) = signal(String::new());
 
     // spawn_local(async move {
     //     set_svg_src.set(
@@ -801,12 +802,12 @@ fn Connections() -> impl IntoView {
                                                 />
                                                 // <label for="src_mod_index"> { format!("{module:?}") } </label>
                                             </div>
-                                        }
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <div class="text-left">
                                             </div>
-                                        }
+                                        }.into_any()
                                     }}
                                 }
                                 // get mod output
@@ -824,12 +825,12 @@ fn Connections() -> impl IntoView {
                                                     value="0"
                                                 />
                                             </div>
-                                        }
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <div class="text-left">
                                             </div>
-                                        }
+                                        }.into_any()
                                     }}
                                 }
                             </div>
@@ -878,12 +879,12 @@ fn Connections() -> impl IntoView {
                                                 />
                                                 // <label for="src_mod_index"> { format!("{module:?}") } </label>
                                             </div>
-                                        }
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <div class="text-left">
                                             </div>
-                                        }
+                                        }.into_any()
                                     }}
                                 }
                                 // get mod output
@@ -901,12 +902,12 @@ fn Connections() -> impl IntoView {
                                                     value="0"
                                                 />
                                             </div>
-                                        }
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <div class="text-left">
                                             </div>
-                                        }
+                                        }.into_any()
                                     }}
                                 }
                             </div>

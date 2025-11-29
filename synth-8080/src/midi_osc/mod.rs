@@ -68,6 +68,7 @@ impl MidiOsc {
     }
 
     pub fn play_note(&mut self, note: Note) -> Result<()> {
+        // pub fn play_note(&mut self, note: Float) -> Result<()> {
         if self.notes.contains(&Some(note)) {
             bail!("{note} is already being played.");
         }

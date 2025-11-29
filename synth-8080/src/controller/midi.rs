@@ -1,7 +1,7 @@
 use super::Note;
 use anyhow::bail;
 use midir::{Ignore, MidiInput, MidiInputConnection, MidiInputPort};
-use midly::{live::LiveEvent, MidiMessage};
+use midly::{MidiMessage, live::LiveEvent};
 use std::{
     future::Future,
     io,
@@ -62,17 +62,20 @@ impl MIDIControls {
                 &in_port,
                 "midir-read-input",
                 // &in_port_name,
-                move |stamp, message, _| {
+                move |_stamp, message, _| {
                     // info!("{}: {:?} (len = {})", stamp, message, message.len());
                     let event = LiveEvent::parse(message).unwrap();
 
                     match event {
-                        LiveEvent::Midi { channel, message } => match message {
+                        LiveEvent::Midi {
+                            channel: _,
+                            message,
+                        } => match message {
                             MidiMessage::NoteOn { key, vel } => {
                                 // info!("hit note {} on channel {}", key, channel);
                                 let note = Note::from(u8::from(key));
                                 // if let Ok(note) = Note::from(&key) {
-                                info!("playing {note}");
+                                trace!("playing {note}");
                                 ctrlr.modules.lock().unwrap().mco[0].play_note(note);
                                 // } else {
                                 //     error!("{}", key.to_string());
@@ -82,7 +85,7 @@ impl MIDIControls {
                                 // info!("released note {} on channel {}", key, channel);
                                 let note = Note::from(u8::from(key));
                                 // if let Ok(note) = Note::from(&key) {
-                                info!("stopping {note}");
+                                trace!("stopping {note}");
                                 ctrlr.modules.lock().unwrap().mco[0].stop_note(note);
                                 // } else {
                                 //     error!("{}", key.to_string());

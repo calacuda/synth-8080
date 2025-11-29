@@ -4,10 +4,11 @@ version = "0.0.0"
 edition = "2024"
 
 [features]
-default = [ "HiFi" ]
+# default = [ "HiFi" ]
+default = [ ]
 HiFi = [ "synth-8080-lib/HiFi" ]
 double_float = [ "synth-8080-lib/double_float" ]
-wav_sample_rate = [ "synth-8080-lib/HiFi" ]
+wav_sample_rate = [ "synth-8080-lib/wav_sample_rate" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]

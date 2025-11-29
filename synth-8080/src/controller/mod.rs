@@ -1,13 +1,12 @@
 use crate::{
     common::notes::Note,
-    output::{self, Audio},
+    output::{self},
     router::Modules,
-    JoinHandle,
 };
 use anyhow::ensure;
-use crossbeam_channel::{unbounded, Receiver};
-use lib::{Connection, FilterType, Float, ModuleType};
-use rodio::{OutputStreamHandle, Source};
+use crossbeam_channel::{Receiver, unbounded};
+use lib::{Connection, FilterType, ModuleType};
+use rodio::{OutputStream, Source};
 use std::sync::Mutex;
 use tracing::*;
 
@@ -27,13 +26,7 @@ pub struct Controller {
 impl Controller {
     pub async fn new(
         to_build: &[ModuleType],
-    ) -> anyhow::Result<(
-        Self,
-        (
-            OutputStreamHandle,
-            impl Source<Item = f32> + Iterator<Item = f32>,
-        ),
-    )> {
+    ) -> anyhow::Result<(Self, impl Source<Item = f32> + Iterator<Item = f32> + use<>)> {
         let (tx, sync) = unbounded();
         let (output, jh) = output::Output::new(tx);
         let modules = Mutex::new(Modules::from(to_build));
@@ -55,18 +48,17 @@ impl Controller {
         let mut playing = self.playing.lock().unwrap();
         let mut mods = self.modules.lock().unwrap();
 
-        if let Some(i) = mods.filter.iter_mut().enumerate().find_map(|(i, f)| {
-            if !f.is_pressed() {
-                Some(i)
-            } else {
-                None
-            }
-        }) && playing
-            .iter()
-            .filter(|(_, n)| *n == note)
-            .peekable()
-            .peek()
-            .is_none()
+        if let Some(i) = mods
+            .filter
+            .iter_mut()
+            .enumerate()
+            .find_map(|(i, f)| if !f.is_pressed() { Some(i) } else { None })
+            && playing
+                .iter()
+                .filter(|(_, n)| *n == note)
+                .peekable()
+                .peek()
+                .is_none()
         {
             // if
             // {

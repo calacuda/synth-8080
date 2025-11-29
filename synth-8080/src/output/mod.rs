@@ -1,11 +1,11 @@
 // use crate::spawn;
-use crate::{common::Module, Float, SAMPLE_RATE};
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
-use rodio::{OutputStream, OutputStreamHandle, Source};
+use crate::{Float, SAMPLE_RATE, common::Module};
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
+use rodio::{OutputStream, OutputStreamBuilder, Source};
 use serialport::{SerialPort, TTYPort};
 use std::{
     io::{Read, Write},
-    thread::{spawn, JoinHandle},
+    thread::{JoinHandle, spawn},
     time::Duration,
 };
 use tracing::*;
@@ -41,7 +41,7 @@ impl Iterator for Audio {
 }
 
 impl Source for Audio {
-    fn current_frame_len(&self) -> Option<usize> {
+    fn current_span_len(&self) -> Option<usize> {
         None
     }
 
@@ -79,7 +79,7 @@ impl Iterator for HWAudio {
 
         let ser = self.serial.as_mut();
         // spawn(move || {
-        let mut sample_bytes: Vec<u8> = ((sample as f64 * i32::MAX as f64) as i32)
+        let sample_bytes: Vec<u8> = ((sample as f64 * i32::MAX as f64) as i32)
             .to_be_bytes()
             .into_iter()
             .collect();
@@ -95,7 +95,7 @@ impl Iterator for HWAudio {
 }
 
 impl Source for HWAudio {
-    fn current_frame_len(&self) -> Option<usize> {
+    fn current_span_len(&self) -> Option<usize> {
         None
     }
 
@@ -125,7 +125,7 @@ impl HWAudio {
     }
 
     pub fn output(&mut self) {
-        let Some(mut serial) = self.serial.as_mut() else {
+        let Some(serial) = self.serial.as_mut() else {
             return;
         };
 
@@ -136,7 +136,7 @@ impl HWAudio {
             // self.ext_sync.send(()).unwrap();
             let sample = self.recv.recv().unwrap();
 
-            let mut sample_bytes: Vec<u8> = ((sample as f64 * i32::MAX as f64) as i32)
+            let sample_bytes: Vec<u8> = ((sample as f64 * i32::MAX as f64) as i32)
                 .to_be_bytes()
                 .into_iter()
                 .collect();
@@ -156,7 +156,7 @@ pub struct Output {
     /// the current sample
     sample: Float,
     /// the rodio output stream, it isn't used but must never be dropped else audio output will cease
-    _stream: OutputStream,
+    pub stream: OutputStream,
     pub volume: Float,
     // hw_audio: HWAudio,
     // hw_audio_thread: JoinHandle<()>,
@@ -165,19 +165,18 @@ pub struct Output {
 impl Output {
     pub fn new(
         ext_sync: Sender<()>,
-    ) -> (
-        Self,
-        (
-            OutputStreamHandle,
-            impl Source<Item = f32> + Iterator<Item = f32>,
-        ),
-    ) {
+    ) -> (Self, impl Source<Item = f32> + Iterator<Item = f32> + use<>) {
         info!("making audio output struct");
         let sample = 0.0;
+        #[cfg(feature = "hardware")]
+        let (int_sync, _rx) = unbounded();
+        #[cfg(not(feature = "hardware"))]
         let (int_sync, rx) = unbounded();
         ext_sync.send(()).unwrap();
+        #[cfg(not(feature = "hardware"))]
         let audio = Audio::new(ext_sync.clone(), rx);
-        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        // let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        let stream = OutputStreamBuilder::open_default_stream().unwrap();
         let (hw_send, hw_rx) = bounded(1);
 
         #[cfg(feature = "hardware")]
@@ -192,7 +191,7 @@ impl Output {
                     .unwrap(),
             );
 
-            let mut audio = HWAudio::new(serial, ext_sync, hw_rx);
+            let audio = HWAudio::new(serial, ext_sync, hw_rx);
 
             // spawn(move || audio.output())
             audio
@@ -215,7 +214,7 @@ impl Output {
                 // ext_sync,
                 int_sync,
                 sample,
-                _stream,
+                stream,
                 volume: 1.0,
                 // hw_audio_thread,
                 hw_send,
@@ -224,9 +223,9 @@ impl Output {
             //     stream_handle.play_raw(audio).unwrap();
             // }),
             #[cfg(feature = "hardware")]
-            (stream_handle, hw_audio),
+            hw_audio,
             #[cfg(not(feature = "hardware"))]
-            (stream_handle, audio),
+            audio,
         )
     }
 

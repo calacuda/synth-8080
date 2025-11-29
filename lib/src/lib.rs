@@ -11,12 +11,14 @@ pub type ModuleId = u8;
 pub type Float = f32;
 // pub const SAMPLE_RATE: u32 = 48_000;
 // pub const SAMPLE_RATE: u32 = 44_100;
+// pub const SAMPLE_RATE: u32 = 24_000;
 // pub const SAMPLE_RATE: u32 = 22_050;
 // pub const SAMPLE_RATE: u32 = 16_000;
 #[cfg(not(feature = "wav_sample_rate"))]
-pub const SAMPLE_RATE: u32 = 24_000;
+pub const SAMPLE_RATE: u32 = 44_100;
 #[cfg(feature = "double_float")]
-pub type Float = f64;
+pub type Float = f32;
+// pub type Float = f64;
 #[cfg(feature = "wav_sample_rate")]
 pub const SAMPLE_RATE: u32 = 48_000;
 
@@ -111,4 +113,10 @@ impl From<Float> for FilterType {
             _ => Self::ADSR,
         }
     }
+}
+
+pub fn midi_to_freq(midi_note: u8) -> f32 {
+    let exp = (f32::from(midi_note) + 36.376_316) / 12.0;
+
+    2.0f32.powf(exp)
 }

@@ -1,11 +1,10 @@
-#![feature(let_chains)]
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use common::Module;
 use lib::ModuleType;
 pub use lib::{Float, SAMPLE_RATE};
 use log::error;
 // use output::Audio;
-use rodio::{OutputStreamHandle, Source};
+use rodio::{OutputStream, Sink, Source};
 use std::{future::Future, mem::size_of, sync::Arc, task::Poll};
 pub use tokio::spawn;
 use tracing::*;
@@ -141,10 +140,7 @@ pub async fn mk_synth(
     modules: &[ModuleType],
 ) -> Result<(
     Arc<controller::Controller>,
-    (
-        OutputStreamHandle,
-        impl Source<Item = f32> + Iterator<Item = f32>,
-    ),
+    (Sink, impl Source<Item = f32> + Iterator<Item = f32> + use<>),
 )> {
     // TODO: read config
 
@@ -157,6 +153,13 @@ pub async fn mk_synth(
         |c| Ok(c),
     )?;
     let ctrlr = Arc::new(raw_ctrlr);
+
+    let sink = if let Ok(output) = ctrlr.output.lock() {
+        rodio::Sink::connect_new(&output.stream.mixer())
+    } else {
+        bail!("failed to start audio playback")
+    };
+
     info!("{} modules made", modules.len());
 
     info!(
@@ -165,7 +168,7 @@ pub async fn mk_synth(
         SAMPLE_RATE
     );
 
-    Ok((ctrlr, audio_handle))
+    Ok((ctrlr, (sink, audio_handle)))
 }
 
 // TODO: overhaul this to use MCO instead of VCO
@@ -177,7 +180,7 @@ pub fn default_connections(synth: Arc<controller::Controller>, n: usize) {
         .indices
         .iter()
         .enumerate()
-        .filter(|x| x.1 .0 == ModuleType::Chorus)
+        .filter(|x| x.1.0 == ModuleType::Chorus)
         .next()
         .unwrap()
         .0 as u8
@@ -187,14 +190,14 @@ pub fn default_connections(synth: Arc<controller::Controller>, n: usize) {
         .indices
         .iter()
         .enumerate()
-        .filter(|x| x.1 .0 == ModuleType::Vco);
+        .filter(|x| x.1.0 == ModuleType::Vco);
     let mut env_i_s = mods
         .indices
         .iter()
         .enumerate()
-        .filter(|x| x.1 .0 == ModuleType::EnvFilter);
+        .filter(|x| x.1.0 == ModuleType::EnvFilter);
 
-    for i in 0..n {
+    for _i in 0..n {
         // get vco
         if let Some((vco_i, _)) = vco_i_s.next() {
             // get env

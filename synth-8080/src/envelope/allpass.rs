@@ -5,7 +5,7 @@ use fundsp::{
     moog::Moog,
     // prelude::*,
 };
-use generic_array::arr;
+use generic_array::{GenericArray, arr};
 use lib::{Float, SAMPLE_RATE};
 use std::f64::consts::PI;
 use tracing::*;
@@ -206,14 +206,16 @@ pub struct LowPassFilter {
     resonance: Float,
     base_resonance: Float,
     env: Float,
-    filter: Moog<Float, Float, U1>,
+    filter: Moog<Float, U1>,
 }
 
 impl LowPassFilter {
     pub fn new() -> Self {
         let start_cutoff = 3_000.0;
         let start_res = 0.5;
-        let filter = Moog::new(SAMPLE_RATE as f64, start_cutoff, start_res);
+        // let filter = Moog::new(SAMPLE_RATE as f64, start_cutoff, start_res);
+        let mut filter = Moog::new(start_cutoff, start_res);
+        filter.set_sample_rate(SAMPLE_RATE as f64);
 
         Self {
             cutoff: start_cutoff,
@@ -263,7 +265,9 @@ impl Filter for LowPassFilter {
     }
 
     fn get_sample(&mut self, audio_in: Float) -> Float {
-        let ar = arr![Float; audio_in];
+        let zero: Float = 0.0;
+        // let ar = arr![zero; audio_in];
+        let ar = GenericArray::from_array([audio_in]);
         let frame: Frame<Float, U1> = Frame::new(ar);
         self.filter.tick(&frame)[0]
     }

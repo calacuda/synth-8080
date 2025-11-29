@@ -517,7 +517,7 @@ async fn main() {
 
     let modules = default_modules();
 
-    let (synth, (stream_handle, audio)) = match mk_synth(&modules).await {
+    let (synth, (sink, audio)) = match mk_synth(&modules).await {
         Ok(synth) => synth,
         Err(e) => {
             error!("{e}");
@@ -533,7 +533,10 @@ async fn main() {
 
     let _audio_gen_thread = spawn(async { audio_gen.await });
     // info!("starting audio stream");
-    stream_handle.play_raw(audio).unwrap();
+    // let sink = rodio::Sink::connect_new(&stream.mixer());
+    // stream_handle.play_raw(audio).unwrap();
+    sink.append(audio);
+    sink.play();
     // info!("audio stream started");
 
     // let midi_con = MIDIControls::new(synth.clone());

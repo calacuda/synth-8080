@@ -1,8 +1,9 @@
 use crate::{
-    common::{bend_range, notes::Note, Module},
-    osc::{OscType, Oscillator},
     Float,
+    common::{Module, bend_range, notes::Note},
+    osc::{OscType, Oscillator},
 };
+use lib::midi_to_freq;
 use std::sync::Arc;
 use tracing::*;
 
@@ -38,7 +39,7 @@ impl Vco {
         let volume_in = 1.0;
         let pitch_in = 0.0;
         let overtones = false;
-        let note = Note::A4;
+        let note = 0;
         let bend_amt = Arc::new(bend_range());
 
         // DEBUG
@@ -72,10 +73,17 @@ impl Vco {
 
     pub fn set_note(&mut self, note: Note) {
         self.note = note;
-        self.osc.set_frequency(note.into());
+        self.osc.set_frequency(midi_to_freq(note.into()));
 
         // info!("set note to {note}")
     }
+
+    // pub fn set_freq(&mut self, note: Float) {
+    //     // self.note = note;
+    //     self.osc.set_frequency(note);
+    //
+    //     // info!("set note to {note}")
+    // }
 }
 
 impl Module for Vco {
