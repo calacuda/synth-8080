@@ -8,7 +8,8 @@ release:
   WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo +nightly tauri dev --release
 
 build:
-  cargo tauri build -f "HiFi"
+  # cargo tauri build -f "HiFi"
+  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo +nightly tauri build -f "HiFi"
 
 tailwind:
   npm list @catppuccin/tailwindcss > /dev/null || npm install -D @catppuccin/tailwindcss
