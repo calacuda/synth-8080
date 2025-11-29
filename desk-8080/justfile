@@ -1,11 +1,12 @@
 run:
-  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo tauri dev -f "HiFi" --release
+  # WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo +nightly tauri dev -f "HiFi" --release
+  cargo +nightly tauri dev -f "HiFi" --release
 
 dev:
-  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo tauri dev
+  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo +nightly tauri dev
 
 release:
-  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo tauri dev --release
+  WEBKIT_DISABLE_COMPOSITING_MODE=1 cargo +nightly tauri dev --release
 
 build:
   cargo tauri build -f "HiFi"

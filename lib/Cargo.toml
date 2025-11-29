@@ -9,6 +9,6 @@ double_float = []
 wav_sample_rate = []
 
 [dependencies]
-serde = { version = "1.0.196", features = ["derive"] }
-strum = { version = "0.26.2", features = ["strum_macros"] }
-strum_macros = "0.26.2"
+serde = { version = "1.0.228", features = ["derive"] }
+strum = { version = "0.27.2", features = ["strum_macros"] }
+strum_macros = "0.27.2"

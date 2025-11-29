@@ -1,10 +1,10 @@
 use crate::{
     common::Module,
-    envelope::{self, adbdr, adsr, EnvelopeFilter, Filter, FILTER_OPEN_IN},
-    vco::{self, Vco, PITCH_BEND_INPUT},
+    envelope::{self, EnvelopeFilter, FILTER_OPEN_IN, Filter, adbdr, adsr},
+    vco::{self, PITCH_BEND_INPUT, Vco},
 };
-use anyhow::{bail, Result};
-use lib::{notes::Note, FilterType, Float, OscType};
+use anyhow::{Result, bail};
+use lib::{FilterType, Float, OscType, notes::Note};
 use std::ops::IndexMut;
 use tracing::*;
 
@@ -79,7 +79,7 @@ impl MidiOsc {
             if self.notes[i].is_none() {
                 self.notes[i] = Some(note);
 
-                let (ref mut vco, ref mut env) = self.oscs.index_mut(i);
+                let (vco, env) = self.oscs.index_mut(i);
 
                 vco.set_note(note);
                 env.recv_samples(FILTER_OPEN_IN, &vec![1.0]);
@@ -100,7 +100,7 @@ impl MidiOsc {
             if self.notes[i] == Some(note) {
                 self.notes[i] = None;
 
-                let (vco, ref mut env) = self.oscs.index_mut(i);
+                let (vco, env) = self.oscs.index_mut(i);
 
                 // vco.osc.set_frequency(0.0);
                 env.recv_samples(FILTER_OPEN_IN, &vec![0.0]);

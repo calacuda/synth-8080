@@ -1,9 +1,9 @@
-use leptos::{leptos_dom::logging::console_log, *};
+use leptos::{leptos_dom::logging::console_log, prelude::*, reactive::spawn_local, *};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
 use std::str::FromStr;
 use strum::IntoEnumIterator;
-use synth_8080_lib::{notes::Note, FilterType, ModuleType, OscType};
+use synth_8080_lib::{FilterType, ModuleType, OscType, notes::Note};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -152,7 +152,7 @@ fn Slider(mut on_input: Box<dyn FnMut(f32)>) -> impl IntoView {
 #[component]
 fn LFO(index: u8) -> impl IntoView {
     // make signal for LFO state
-    let (lfo_type, set_lfo_type) = create_signal(OscType::Sine);
+    let (lfo_type, set_lfo_type) = signal(OscType::Sine);
 
     spawn_local(async move {
         set_lfo_type.set(
